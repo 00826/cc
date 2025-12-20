@@ -1,0 +1,12 @@
+{
+	"name": "cc",
+	"tree": {
+		"$className": "DataModel",
+		"ReplicatedStorage": {
+			"$className": "ReplicatedStorage",
+			"$ignoreUnknownInstances": true,
+			
+			"cc": { "$path": "cc" }
+		}
+	}
+}
