@@ -440,7 +440,7 @@ end
 
 function cameracontroller.touchguithumbstickframe(): Frame?
 	local playergui = LocalPlayer:FindFirstChildOfClass("PlayerGui")::PlayerGui?
-	local touchgui = playergui and playergui:FindFirstChild("ccTouchGui")::ScreenGui?
+	local touchgui = playergui and playergui:FindFirstChild("cc_touchgui")::ScreenGui?
 	local thumbstickframe = touchgui and touchgui:FindFirstChild("ThumbstickFrame")::Frame?
 
 	return thumbstickframe

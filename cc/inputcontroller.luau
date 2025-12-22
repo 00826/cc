@@ -110,6 +110,18 @@ local inputcontroller = {
 	--- for consistency
 	touchgui = nil :: ScreenGui?;
 
+	--- current virtual cursor gui \
+	--- touchgui is always instantiated
+	--- regardless of current input \
+	--- for consistency
+	virtualcursorgui = nil :: ScreenGui?;
+	virtualcursorcanvasgroup = nil :: CanvasGroup?;
+	virtualcursortransparency = 0.5; --- canvasgroup transparency
+	virtualcursorappearance = {
+		{ anchorpoint = Vector2.new(1, 0.5); size = UDim2.fromOffset(2, 24); position = UDim2.fromOffset(32, 32); rotation = 0; color = Color3.fromRGB(255, 255, 255); strokesize = 1; stroketransparency = 0.75; strokecolor = Color3.fromRGB(27, 42, 53); };
+		{ anchorpoint = Vector2.new(1, 0.5); size = UDim2.fromOffset(2, 24); position = UDim2.fromOffset(32, 32); rotation = 90; color = Color3.fromRGB(255, 255, 255); strokesize = 1; stroketransparency = 0.75; strokecolor = Color3.fromRGB(27, 42, 53); };
+	};
+
 	--- `Enum.DisplaySize -> touch thumbstick ring size` conversion table
 	thumbstickringmap = {
 		[Enum.DisplaySize.Small] = UDim2.fromOffset(72, 72);
@@ -303,10 +315,10 @@ end
 function inputcontroller.createtouchgui(playergui: PlayerGui)
 	--- base touchgui
 	local touchgui = Instance.new("ScreenGui")
-	touchgui.Name = "ccTouchGui"
+	touchgui.Name = "cc_touchgui"
+	touchgui.IgnoreGuiInset = false
 	touchgui.SafeAreaCompatibility = Enum.SafeAreaCompatibility.FullscreenExtension
 	touchgui.ScreenInsets = Enum.ScreenInsets.CoreUISafeInsets
-	touchgui.IgnoreGuiInset = false
 	touchgui.ResetOnSpawn = false
 
 	--- bottom-left thumbstick frame
@@ -364,9 +376,69 @@ function inputcontroller.createtouchgui(playergui: PlayerGui)
 	return touchgui
 end
 
+--- returns an empty virtual cursor
+function inputcontroller.createvirtualcursor(playergui: PlayerGui)
+	--- base touchgui
+	local virtualcursorgui = Instance.new("ScreenGui")
+	virtualcursorgui.Name = "cc_virtualcursorgui"
+	virtualcursorgui.IgnoreGuiInset = true
+	virtualcursorgui.ScreenInsets = Enum.ScreenInsets.None
+	virtualcursorgui.SafeAreaCompatibility = Enum.SafeAreaCompatibility.None
+	virtualcursorgui.ResetOnSpawn = false
+	virtualcursorgui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+
+	local cursor = Instance.new("CanvasGroup")
+	cursor.Name = "Cursor"
+	cursor.AnchorPoint = Vector2.one * 0.5
+	cursor.Size = UDim2.fromOffset(64, 64)
+	cursor.Position = UDim2.fromScale(0.5, 0.5)
+	cursor.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+	cursor.BackgroundTransparency = 1
+	cursor.BorderSizePixel = 0
+	cursor.ZIndex = 1
+	cursor.Parent = virtualcursorgui
+
+	virtualcursorgui.Parent = playergui
+
+	return virtualcursorgui
+end
+
+--- applies cursor appearance `a` to virtual cursor canvas group `cursorcanvasgroup`
+function inputcontroller.applyvirtualcursorfromappearance(a: typeof(inputcontroller.virtualcursorappearance), cursorcanvasgroup: CanvasGroup)
+	cursorcanvasgroup:ClearAllChildren()
+	cursorcanvasgroup.GroupTransparency = inputcontroller.virtualcursortransparency
+	
+	local frames = table.create(#a)
+	for i, line in ipairs(a) do
+		local frame = Instance.new("Frame")
+		frame.Name = tostring(i)
+		frame.AnchorPoint = line.anchorpoint
+		frame.Size = line.size
+		frame.Position = line.position
+		frame.Rotation = line.rotation
+		frame.BackgroundColor3 = line.color
+		frame.BorderSizePixel = 0
+
+		local uistroke = Instance.new("UIStroke")
+		uistroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+		uistroke.Color = line.strokecolor
+		uistroke.LineJoinMode = Enum.LineJoinMode.Miter
+		uistroke.StrokeSizingMode = Enum.StrokeSizingMode.FixedSize
+		uistroke.Thickness = line.strokesize
+		uistroke.Transparency = line.stroketransparency
+		uistroke.Parent = frame
+
+		table.insert(frames, frame)
+
+		frame.Parent = cursorcanvasgroup
+	end
+
+	return frames
+end
+
 --- returns internally-resolved `UserInputService.PreferredInput` signal based on recency
 function inputcontroller.preferredinputchanged()
-	return script:GetAttributeChangedSignal("preferredinput")
+	return script:GetAttributeChangedSignal(inputcontroller.preferredinputflag)
 end
 
 if RunService:IsClient() then
@@ -402,6 +474,20 @@ if RunService:IsClient() then
 			inputcontroller.preferredinputchanged():Connect(function()
 				touchgui.Enabled = inputcontroller.touchguivisibility[inputcontroller.preferredinput]
 			end)
+		end)
+		if not s then warn(e) end
+	end
+	do --- resolve virtual cursor
+		local s, e = pcall(function()
+			local playergui = LocalPlayer:WaitForChild("PlayerGui")
+			local virtualcursor = inputcontroller.createvirtualcursor(playergui)
+			
+			inputcontroller.virtualcursor = virtualcursor
+			inputcontroller.virtualcursorcanvasgroup = virtualcursor:FindFirstChild("Cursor") :: CanvasGroup?
+
+			if inputcontroller.virtualcursorcanvasgroup then
+				inputcontroller.applyvirtualcursorfromappearance(inputcontroller.virtualcursorappearance, inputcontroller.virtualcursorcanvasgroup)
+			end
 		end)
 		if not s then warn(e) end
 	end

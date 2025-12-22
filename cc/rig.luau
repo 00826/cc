@@ -334,6 +334,7 @@ function rig.applybodycolors(r: typeof(rig.create()), bodycolors: { [string]: Co
 
 		local targetcolor = bodycolors[limbcolorproperty]
 		if not targetcolor then continue end
+		if type(targetcolor) == "string" then targetcolor = Color3.fromHex(targetcolor) end
 		if typeof(targetcolor) ~= "Color3" then warn(string.format("expected Color3, got %s", typeof(targetcolor))); continue end
 
 		for _, limb in r:QueryDescendants(string.format(">[ClassName = Part][Name = %s]", name)) do
@@ -350,7 +351,8 @@ function rig.applyclothing(r: typeof(rig.create()), clothing: { Shirt: string?; 
 		local clothingproperties = entry.humanoiddescriptionclothingproperties
 		for _, property in clothingproperties do
 			local targetassetid = clothing[property]
-			if typeof(targetassetid) ~= "string" then warn(string.format("expected Color3, got %s", typeof(targetassetid))); continue end
+			if type(targetassetid) == "nil" then continue end
+			if type(targetassetid) ~= "string" then warn(string.format("expected string, got %s", typeof(targetassetid))); continue end
 			local targetcolor = Color3.fromRGB(255, 255, 255)
 
 			if property == "Shirt" then
