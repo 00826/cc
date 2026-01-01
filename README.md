@@ -57,6 +57,8 @@ because of this some annotations are on the more verbose side hopefully for bett
 
 [cc/rig.luau](cc/rig.luau) is a minimal motor6d-basepart-animationcontroller rig constructor/mutator meant to create rigs that are visually identical to humanoid r6 rigs without the humanoid bloat
 
+[cc-rig-unwrap.png](cc-rig-unwrap.png) is a blank clothing template for the default limbs found in `cc/rig.luau` (torso, left arm, left leg, right arm, right leg)
+
 ---
 
 ㅍ cc by 00826 / overflowed
