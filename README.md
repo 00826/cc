@@ -1,10 +1,12 @@
 # ccㅤ/character controller/
 
+humanoidless player-character controller and replicator
+
 ## about
 
 |ico.svg|lore|
 |-|-|
-|<img src="./cc-ico.svg" width="96"/>|humanoidless player controller and replicator as a simple all-in-one-place alternative to the `PlayerModule`, `Humanoids`, and player-character replication|
+|<img src="./cc-ico.svg" width="96"/>|humanoidless player-character controller and replicator as a simple all-in-one-place alternative to the roblox `PlayerModule` and `Humanoids`|
 
 ## gotchas
 
