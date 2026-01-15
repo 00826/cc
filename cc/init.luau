@@ -487,7 +487,7 @@ function cc.step(character: typeof(cc.create()), dt: number)
 
 	--- update output
 	output.cframe = rootcframe * cameracframe.Rotation
-	output.Floor = floor
+	output.floor = floor
 	output.locomotion = locomotion or 0
 	output.truevector = truevector
 end

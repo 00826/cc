@@ -103,6 +103,9 @@ local inputcontroller = {
 	touchcurrentposition = Vector3.zero;
 	--- touch thumbstick (L3) deadzone
 	touchdeadzone = 0.1;
+	--- touch connections so thumbstick inputs can be read through the client gui (menu/chat button etc)
+	touchmovedconnection = nil :: RBXScriptConnection?;
+	touchendedconnection = nil :: RBXScriptConnection?;
 
 	--- current touch gui \
 	--- touchgui is always instantiated
@@ -116,7 +119,7 @@ local inputcontroller = {
 	--- for consistency
 	virtualcursorgui = nil :: ScreenGui?;
 	virtualcursorcanvasgroup = nil :: CanvasGroup?;
-	virtualcursortransparency = 0.5; --- canvasgroup transparency
+	virtualcursortransparency = 1/3; --- canvasgroup transparency
 	virtualcursorappearance = {
 		{ anchorpoint = Vector2.new(1, 0.5); size = UDim2.fromOffset(2, 24); position = UDim2.fromOffset(32, 32); rotation = 0; color = Color3.fromRGB(255, 255, 255); strokesize = 1; stroketransparency = 0.75; strokecolor = Color3.fromRGB(27, 42, 53); };
 		{ anchorpoint = Vector2.new(1, 0.5); size = UDim2.fromOffset(2, 24); position = UDim2.fromOffset(32, 32); rotation = 90; color = Color3.fromRGB(255, 255, 255); strokesize = 1; stroketransparency = 0.75; strokecolor = Color3.fromRGB(27, 42, 53); };
@@ -170,6 +173,22 @@ function inputcontroller.rebind(preferredinput: Enum.PreferredInput)
 		ContextActionService:BindActionAtPriority(inputcontroller.contextactionname, inputcontroller.gamepad, false, inputcontroller.actionpriorities[preferredinput], Enum.KeyCode.Thumbstick1)
 	elseif preferredinput == Enum.PreferredInput.Touch then
 		ContextActionService:BindActionAtPriority(inputcontroller.contextactionname, inputcontroller.touch, false, inputcontroller.actionpriorities[preferredinput], Enum.UserInputType.Touch)
+
+		if inputcontroller.touchmovedconnection then
+			inputcontroller.touchmovedconnection:Disconnect()
+			inputcontroller.touchmovedconnection = nil
+		end
+		inputcontroller.touchmovedconnection = UserInputService.TouchMoved:Connect(function(inputobject: InputObject)
+			inputcontroller.touch(inputcontroller.contextactionname, Enum.UserInputState.Change, inputobject)
+		end)
+
+		if inputcontroller.touchendedconnection then
+			inputcontroller.touchendedconnection:Disconnect()
+			inputcontroller.touchendedconnection = nil
+		end
+		inputcontroller.touchendedconnection = UserInputService.TouchEnded:Connect(function(inputobject: InputObject)
+			inputcontroller.touch(inputcontroller.contextactionname, Enum.UserInputState.End, inputobject)
+		end)
 	else
 		warn("unaccounted preferredinput:", preferredinput.Name)
 	end
