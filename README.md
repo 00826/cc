@@ -41,6 +41,8 @@ because of this some annotations are on the more verbose side hopefully for bett
 `cc.input` is the input table read from by the `cc` mutator functions and is meant to be written to externally \
 `cc.output` is the output table written to during `cc.step(...)` and is meant to be read from externally
 
+`cc.step()` works best when bound to `RunService.Heartbeat`, as binding it to renderstep at any renderpriority causes character jitter and binding it to stepped causes characters to fling when jumping
+
 ## the rewritten playermodule
 
 [cc/cameracontroller.luau](cc/cameracontroller.luau) \

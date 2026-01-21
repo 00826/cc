@@ -127,9 +127,9 @@ local cc = {
 		bodyvelocitymaxforcemodifier = 1;
 		bodyvelocityp = 100;
 
-		bodygyrod = 500;
-		bodygyromaxtorque = Vector3.new(400000, 400000, 400000);
-		bodygyrop = 500;
+		bodygyrod = 50;
+		bodygyromaxtorque = Vector3.new(math.huge, math.huge, math.huge);
+		bodygyrop = 100000;
 	};
 	output = {
 		--- floor, if found, of character stepped by `cc.step()`
@@ -453,9 +453,7 @@ function cc.step(character: typeof(cc.create()), dt: number)
 	bodygyro.P = input.bodygyrop
 	bodygyro.CFrame = CFrame.identity
 
-	--- forcing rootpart cframe resolves camera jitter for some reason likely some conflict with movers
 	local rootcframe = CFrame.new(cframe.Position)
-	rootpart.CFrame = rootcframe
 	rootpart.AssemblyAngularVelocity = Vector3.zero
 
 	--- resolve bodyvelocity

@@ -55,7 +55,7 @@ local cameracontroller = {
 	--- input priority
 	inputpriority = Enum.ContextActionPriority.Medium.Value;
 	--- render priority
-	renderpriority = Enum.RenderPriority.Camera.Value;
+	renderpriority = Enum.RenderPriority.Camera.Value - 1;
 
 	--- arrow key camera pan speed in radians/sec \
 	--- ROTATION_SPEED_KEYS
