@@ -16,10 +16,18 @@ local rig = {
 
 			attachments = {
 				RootAttachment = CFrame.new(0, 0, 0);
+
+				RootJointAttachment0 = CFrame.new() * CFrame.fromOrientation(-math.pi/2, -math.pi, 0);
 			};
-			motors = {
+			animationconstraints = {
+				RootJoint = { attachment0 = "RootJointAttachment0"; attachment1 = "RootJointAttachment1"; iskinematic = true; };
+			};
+			ballsocketconstraints = {
+				
+			};
+			--[[motors = {
 				RootJoint = { ragdolls = false; part1 = "Torso"; c0 = CFrame.new() * CFrame.fromOrientation(-math.pi/2, -math.pi, 0); c1 = CFrame.new() * CFrame.fromOrientation(-math.pi/2, -math.pi, 0); };
-			};
+			};]]
 			ragdollcollision = false;
 		};
 
@@ -40,10 +48,18 @@ local rig = {
 				FaceFrontAttachment = CFrame.new(0, 0, -0.65);
 				HairAttachment = CFrame.new(0, 0.6, 0);
 				HatAttachment = CFrame.new(0, 0.6, 0);
-			};
-			motors = {
 
+				NeckAttachment1 = CFrame.new(0, -0.5, 0) * CFrame.fromOrientation(-math.pi/2, -math.pi, 0);
 			};
+			animationconstraints = {
+				
+			};
+			ballsocketconstraints = {
+				
+			};
+			--[[motors = {
+
+			};]]
 			ragdollcollision = true;
 		};
 		--- torso
@@ -66,14 +82,36 @@ local rig = {
 				WaistBackAttachment = CFrame.new(0, -1, 0.5);
 				WaistCenterAttachment = CFrame.new(0, -1, 0);
 				WaistFrontAttachment = CFrame.new(0, -1, -0.5);
+
+				RootJointAttachment1 = CFrame.new(0, 0, 0) * CFrame.fromOrientation(-math.pi/2, -math.pi, 0);
+
+				LeftHipAttachment0 = CFrame.new(-1, -1, 0) * CFrame.fromOrientation(0, -math.pi/2, 0);
+				LeftShoulderAttachment0 = CFrame.new(-1, 0.5, 0) * CFrame.fromOrientation(0, -math.pi/2, 0);
+				NeckAttachment0 = CFrame.new(0, 1, 0) * CFrame.fromOrientation(-math.pi/2, -math.pi, 0);
+				RightHipAttachment0 = CFrame.new(1, -1, 0) * CFrame.fromOrientation(0, math.pi/2, 0);
+				RightShoulderAttachment0 = CFrame.new(1, 0.5, 0) * CFrame.fromOrientation(0, math.pi/2, 0);
 			};
-			motors = {
+			animationconstraints = {
+				LeftHip = { attachment0 = "LeftHipAttachment0"; attachment1 = "LeftHipAttachment1"; iskinematic = true; };
+				LeftShoulder = { attachment0 = "LeftShoulderAttachment0"; attachment1 = "LeftShoulderAttachment1"; iskinematic = true; };
+				Neck = { attachment0 = "NeckAttachment0"; attachment1 = "NeckAttachment1"; iskinematic = true; };
+				RightHip = { attachment0 = "RightHipAttachment0"; attachment1 = "RightHipAttachment1"; iskinematic = true; };
+				RightShoulder = { attachment0 = "RightShoulderAttachment0"; attachment1 = "RightShoulderAttachment1"; iskinematic = true; };
+			};
+			ballsocketconstraints = {
+				LeftHip = { attachment0 = "LeftHipAttachment0"; attachment1 = "LeftHipAttachment1"; };
+				LeftShoulder = { attachment0 = "LeftShoulderAttachment0"; attachment1 = "LeftShoulderAttachment1"; };
+				Neck = { attachment0 = "NeckAttachment0"; attachment1 = "NeckAttachment1"; };
+				RightHip = { attachment0 = "RightHipAttachment0"; attachment1 = "RightHipAttachment1"; };
+				RightShoulder = { attachment0 = "RightShoulderAttachment0"; attachment1 = "RightShoulderAttachment1"; };
+			};
+			--[[motors = {
 				LeftHip = { ragdolls = true; part1 = "LeftLeg"; c0 = CFrame.new(-1, -1, 0) * CFrame.fromOrientation(0, -math.pi/2, 0); c1 = CFrame.new(-0.5, 1, 0) * CFrame.fromOrientation(0, -math.pi/2, 0); };
 				LeftShoulder = { ragdolls = true; part1 = "LeftArm"; c0 = CFrame.new(-1, 0.5, 0) * CFrame.fromOrientation(0, -math.pi/2, 0); c1 = CFrame.new(0.5, 0.5, 0) * CFrame.fromOrientation(0, -math.pi/2, 0); };
 				Neck = { ragdolls = true; part1 = "Head"; c0 = CFrame.new(0, 1, 0) * CFrame.fromOrientation(-math.pi/2, -math.pi, 0); c1 = CFrame.new(0, -0.5, 0) * CFrame.fromOrientation(-math.pi/2, -math.pi, 0); };
 				RightHip = { ragdolls = true; part1 = "RightLeg"; c0 = CFrame.new(1, -1, 0) * CFrame.fromOrientation(0, math.pi/2, 0); c1 = CFrame.new(0.5, 1, 0) * CFrame.fromOrientation(0, math.pi/2, 0); };
 				RightShoulder = { ragdolls = true; part1 = "RightArm"; c0 = CFrame.new(1, 0.5, 0) * CFrame.fromOrientation(0, math.pi/2, 0); c1 = CFrame.new(-0.5, 0.5, 0) * CFrame.fromOrientation(0, math.pi/2, 0); };
-			};
+			};]]
 			ragdollcollision = true;
 		};
 		--- left
@@ -90,10 +128,20 @@ local rig = {
 			attachments = {
 				LeftGripAttachment = CFrame.new(0, -1, 0);
 				LeftShoulderAttachment = CFrame.new(0, 1, 0);
+
+				LeftShoulderAttachment1 = CFrame.new(0.5, 0.5, 0) * CFrame.fromOrientation(0, -math.pi/2, 0);
+
+				LeftWristAttachment0 = CFrame.new(0, -1, 0) * CFrame.fromOrientation(-math.pi/2, 0, 0);
 			};
-			motors = {
+			animationconstraints = {
+				LeftWrist = { attachment0 = "LeftWristAttachment0"; attachment1 = "LeftWristAttachment1"; iskinematic = true; };
+			};
+			ballsocketconstraints = {
+				
+			};
+			--[[motors = {
 				LeftWrist = { ragdolls = false; part1 = "LeftHand"; c0 = CFrame.new(0, -1, 0) * CFrame.fromOrientation(-math.pi/2, 0, 0); c1 = CFrame.new() * CFrame.fromOrientation(0, 0, 0); };
-			};
+			};]]
 			ragdollcollision = true;
 		};
 		LeftHand = {
@@ -108,9 +156,14 @@ local rig = {
 
 			attachments = {
 				LeftHandAttachment = CFrame.new(0, 0, 0);
-			};
-			motors = {
 
+				LeftWristAttachment1 = CFrame.new(0, 0, 0) * CFrame.fromOrientation(0, 0, 0);
+			};
+			animationconstraints = {
+				
+			};
+			ballsocketconstraints = {
+				
 			};
 			ragdollcollision = false;
 		};
@@ -126,9 +179,14 @@ local rig = {
 
 			attachments = {
 				LeftFootAttachment = CFrame.new(0, -1, 0);
-			};
-			motors = {
 
+				LeftHipAttachment1 = CFrame.new(-0.5, 1, 0) * CFrame.fromOrientation(0, -math.pi/2, 0);
+			};
+			animationconstraints = {
+				
+			};
+			ballsocketconstraints = {
+				
 			};
 			ragdollcollision = true;
 		};
@@ -146,10 +204,23 @@ local rig = {
 			attachments = {
 				RightGripAttachment = CFrame.new(0, -1, 0);
 				RightShoulderAttachment = CFrame.new(0, 1, 0);
+
+				RightShoulderAttachment1 = CFrame.new(-0.5, 0.5, 0) * CFrame.fromOrientation(0, math.pi/2, 0);
+
+				RightWristAttachment0 = CFrame.new(0, -1, 0) * CFrame.fromOrientation(-math.pi/2, 0, 0);
+			};
+			animationconstraints = {
+				RightWrist = { attachment0 = "RightWristAttachment0"; attachment1 = "RightWristAttachment1"; iskinematic = true; };
+			};
+			ballsocketconstraints = {
+				
 			};
 			motors = {
-				RightWrist = { ragdolls = false; part1 = "RightHand"; c0 = CFrame.new(0, -1, 0) * CFrame.fromOrientation(-math.pi/2, 0, 0); c1 = CFrame.new() * CFrame.fromOrientation(0, 0, 0); };
+
 			};
+			--[[motors = {
+				RightWrist = { ragdolls = false; part1 = "RightHand"; c0 = CFrame.new(0, -1, 0) * CFrame.fromOrientation(-math.pi/2, 0, 0); c1 = CFrame.new() * CFrame.fromOrientation(0, 0, 0); };
+			};]]
 			ragdollcollision = true;
 		};
 		RightHand = {
@@ -164,9 +235,14 @@ local rig = {
 
 			attachments = {
 				RightHandAttachment = CFrame.new(0, 0, 0);
-			};
-			motors = {
 
+				RightWristAttachment1 = CFrame.new(0, 0, 0) * CFrame.fromOrientation(0, 0, 0);
+			};
+			animationconstraints = {
+				
+			};
+			ballsocketconstraints = {
+				
 			};
 			ragdollcollision = false;
 		};
@@ -182,15 +258,31 @@ local rig = {
 
 			attachments = {
 				RightFootAttachment = CFrame.new(0, -1, 0);
-			};
-			motors = {
 
+				RightHipAttachment1 = CFrame.new(0.5, 1, 0) * CFrame.fromOrientation(0, math.pi/2, 0);
+			};
+			animationconstraints = {
+				
+			};
+			ballsocketconstraints = {
+				
 			};
 			ragdollcollision = true;
 		};
 	};
+	
+	ballsocketconstraintproperties = {
+		LimitsEnabled = true;
+		TwistLimitsEnabled = true;
+		UpperAngle = 45;
+		Restitution = 0;
+		MaxFrictionTorque = 5;
+		TwistLowerAngle = -25;
+		TwistUpperAngle = 25;
+	};
 
-	motorangleflag = "cc_aangle";
+	angleflag = "rig_angle";
+	maxvelocityflag = "rig_maxvelocity";
 
 	swaptabler6 = {
 		["HumanoidRootPart"] = "RootPart";
@@ -233,8 +325,11 @@ function rig.create(lt: typeof(rig.limbs)?)
 	animator.Parent = animationcontroller
 	animationcontroller.Parent = r
 
-	--- resolve limbs
+	--- resolve limbs, attachments, animationconstraints
 	local limbs = {}
+	local attachments = {}
+	local animationconstraints = {}
+	local ballsocketconstraints = {}
 
 	for name, entry in (lt or rig.limbs)::any do
 		local limb = Instance.new("Part")
@@ -256,10 +351,10 @@ function rig.create(lt: typeof(rig.limbs)?)
 			limb.CanCollide = false
 		elseif limb.Name == "Head" then
 			limb.CastShadow = true
-			limb.CanCollide = true
+			limb.CanCollide = false --- true
 		elseif limb.Name == "Torso" then
 			limb.CastShadow = true
-			limb.CanCollide = true
+			limb.CanCollide = false --- true
 		else
 			limb.CastShadow = true
 			limb.CanCollide = false
@@ -271,6 +366,11 @@ function rig.create(lt: typeof(rig.limbs)?)
 			attachment.Name = k
 			attachment.CFrame = cframe
 			attachment.Parent = limb
+
+			if attachments[k] then
+				print("duplicate attachment overwritten:", k)
+			end
+			attachments[k] = attachment
 		end
 
 		--- limb mesh
@@ -304,18 +404,32 @@ function rig.create(lt: typeof(rig.limbs)?)
 		limbs[name] = limb
 	end
 
-	--- resolve motors
+	--- resolve animationconstraints and ballsocketconstraints
 	for name, entry: any in rig.limbs do
 		local limb = limbs[name]
-		for motorname, properties in entry.motors do
-			local motor6d = Instance.new("Motor6D")
-			motor6d.Name = motorname
-			motor6d.Parent = limb
+		for acname, properties in entry.animationconstraints do
+			local animationconstraint = Instance.new("AnimationConstraint")
+			animationconstraint.Name = acname
+			animationconstraint.Parent = limb
+			animationconstraint.Attachment0 = attachments[properties.attachment0]
+			animationconstraint.Attachment1 = attachments[properties.attachment1]
+			animationconstraint.IsKinematic = properties.iskinematic == true
 
-			motor6d.Part0 = limb
-			motor6d.Part1 = limbs[properties.part1]
-			motor6d.C0 = properties.c0
-			motor6d.C1 = properties.c1
+			animationconstraints[acname] = animationconstraint
+		end
+		for bscname, properties in entry.ballsocketconstraints do
+			local ballsocketconstraint = Instance.new("BallSocketConstraint")
+			ballsocketconstraint.Name = bscname
+			ballsocketconstraint.Enabled = false
+			ballsocketconstraint.Parent = limb
+			ballsocketconstraint.Attachment0 = attachments[properties.attachment0]
+			ballsocketconstraint.Attachment1 = attachments[properties.attachment1]
+
+			for k, v in rig.ballsocketconstraintproperties do
+				(ballsocketconstraint::any)[k] = v
+			end
+
+			ballsocketconstraints[bscname] = ballsocketconstraint
 		end
 	end
 
@@ -397,76 +511,66 @@ function rig.applybodypartappearance(r: typeof(rig.create()), bodypart: string, 
 	end
 end
 
-function rig.ragdollmotors()
-	local result = {}
-	for _, entry: any in rig.limbs do
-		for motor: string, m in entry.motors do
-			if m.ragdolls == true then
-				table.insert(result, motor)
+--- toggles enabled property of constraints in rig and sets limb cancollide \
+--- `"animationconstraint"` for non-ragdoll \
+--- `"ballsocketconstraint"` for radgoll
+function rig.setactiveconstraints(r: typeof(rig.create()), activeconstraint: "animationconstraint"|"ballsocketconstraint")
+	for name: any, entry: any in rig.limbs do
+		local limb = r:FindFirstChild(name)
+		--- cancollide
+		if limb and limb:IsA("BasePart") and entry.ragdollcollision == true then
+			if activeconstraint == "animationconstraint" then
+				limb.CanCollide = false --- true
+			elseif activeconstraint == "ballsocketconstraint" then
+				limb.CanCollide = true
 			end
 		end
 	end
 
-	return result
-end
-
-function rig.ragdolllimbs()
-	local result = {}
-	for limbname: string, entry: any in rig.limbs::any do
-		if entry.ragdollcollision == true then
-			table.insert(result, limbname)
+	--- constraints
+	for _, thing in r:QueryDescendants("AnimationConstraint, BallSocketConstraint") do
+		if thing:IsA("AnimationConstraint") then
+			thing.Enabled = activeconstraint == "animationconstraint"
+		elseif thing:IsA("BallSocketConstraint") then
+			thing.Enabled = activeconstraint == "ballsocketconstraint"
 		end
 	end
-
-	return result
 end
 
 --- solves motor6d.desiredangle
-function rig.solvemotordesiredangle(motor: Motor6D, desiredangle: number): number
-	local current = (motor:GetAttribute(rig.motorangleflag) or 0) :: number
+function rig.solveanimationconstraintdesiredangle(motor: AnimationConstraint, desiredangle: number)
+	local currentangle = (motor:GetAttribute(rig.angleflag) or 0) :: number
+	local maxvelocity = (motor:GetAttribute(rig.maxvelocityflag) or 0) :: number
 
-	if desiredangle > current then
-		current += motor.MaxVelocity * 1
-		if current > desiredangle then
-			current = desiredangle
+	if desiredangle > currentangle then
+		currentangle += maxvelocity * 1
+		if currentangle > desiredangle then
+			currentangle = desiredangle
 		end
-	elseif desiredangle < current then
-		current += motor.MaxVelocity * -1
-		if current < desiredangle then
-			current = desiredangle
+	elseif desiredangle < currentangle then
+		currentangle += maxvelocity * -1
+		if currentangle < desiredangle then
+			currentangle = desiredangle
 		end
 	else
-		current = desiredangle
+		currentangle = desiredangle
 	end
 
-	motor:SetAttribute(rig.motorangleflag, current)
-	return current
+	motor:SetAttribute(rig.angleflag, currentangle)
+	return currentangle
 end
 
 --- resets motor transforms \
 --- call before playing a non-procedural animation
-function rig.resetmotortransforms(r: typeof(rig.create()))
-	local root = r:FindFirstChild("RootPart")
-	assert(root and root:IsA("BasePart"))
-	local torso = r:FindFirstChild("Torso")
-	assert(torso and torso:IsA("BasePart"))
-
-	for _, motor in {
-		root:FindFirstChild("RootJoint"),
-		torso:FindFirstChild("Neck"),
-		torso:FindFirstChild("RightShoulder"),
-		torso:FindFirstChild("RightHip"),
-		torso:FindFirstChild("LeftShoulder"),
-		torso:FindFirstChild("LeftHip")
-	} do
-		if motor and motor:IsA("Motor6D") then
-			motor.Transform = CFrame.identity
-		end
+function rig.resetanimationconstrainttransforms(r: typeof(rig.create()))
+	for _, animationconstraint in r:QueryDescendants("AnimationConstraint") do
+		assert(animationconstraint:IsA("AnimationConstraint"))
+		animationconstraint.Transform = CFrame.identity
 	end
 end
 
---- procedurally-animates rig motors
-function rig.stepmotors(
+--- advances rig animation constraint transforms wrt elapsed time
+function rig.stepanimationconstraints(
 	r: typeof(rig.create()),
 	locomotion: "idle" | "walk" | "fall" | "seat" | "fly",
 	crouched: boolean,
@@ -475,14 +579,14 @@ function rig.stepmotors(
 	freq: number?
 )
 	local root = r:FindFirstChild("RootPart") :: BasePart
-	local rootjoint = root:FindFirstChild("RootJoint") :: Motor6D
+	local rootjoint = root:FindFirstChild("RootJoint") :: AnimationConstraint
 
 	local torso = r:FindFirstChild("Torso") :: BasePart
-	local neck = torso:FindFirstChild("Neck") :: Motor6D
-	local rightshoulder = torso:FindFirstChild("RightShoulder") :: Motor6D
-	local righthip = torso:FindFirstChild("RightHip") :: Motor6D
-	local leftshoulder = torso:FindFirstChild("LeftShoulder") :: Motor6D
-	local lefthip = torso:FindFirstChild("LeftHip") :: Motor6D
+	local neck = torso:FindFirstChild("Neck") :: AnimationConstraint
+	local rightshoulder = torso:FindFirstChild("RightShoulder") :: AnimationConstraint
+	local righthip = torso:FindFirstChild("RightHip") :: AnimationConstraint
+	local leftshoulder = torso:FindFirstChild("LeftShoulder") :: AnimationConstraint
+	local lefthip = torso:FindFirstChild("LeftHip") :: AnimationConstraint
 
 	if (not neck)
 	or (not rightshoulder)
@@ -494,8 +598,8 @@ function rig.stepmotors(
 	end
 
 	if locomotion == "seat" then
-		rightshoulder.MaxVelocity = 0.15
-		leftshoulder.MaxVelocity = 0.15
+		rightshoulder:SetAttribute(rig.maxvelocityflag, 0.15)
+		leftshoulder:SetAttribute(rig.maxvelocityflag, 0.15)
 		--- rightshoulder.DesiredAngle = math.pi/2
 		--- leftshoulder.DesiredAngle = -math.pi/2
 		--- righthip.DesiredAngle = math.pi/2
@@ -504,6 +608,7 @@ function rig.stepmotors(
 		leftshoulder.Transform = CFrame.Angles(0, 0, -math.pi/2)
 		righthip.Transform = CFrame.Angles(0, 0, math.pi/2)
 		lefthip.Transform = CFrame.Angles(0, 0, -math.pi/2)
+
 		return
 	end
 	
@@ -511,22 +616,22 @@ function rig.stepmotors(
 
 	if (crouched)
 	then
-		neck.MaxVelocity = 0.5
-		rootjoint.MaxVelocity = 0.5
+		neck:SetAttribute(rig.maxvelocityflag, 0.5)
+		rootjoint:SetAttribute(rig.maxvelocityflag, 0.5)
 		addhipangle = math.pi/4
-		neck.Transform = CFrame.Angles(rig.solvemotordesiredangle(neck, -math.pi/4), 0, 0)
-		rootjoint.Transform = CFrame.new(0, 0, -0.25) * CFrame.Angles(rig.solvemotordesiredangle(rootjoint, math.pi/4), 0, 0)
+		neck.Transform = CFrame.Angles(rig.solveanimationconstraintdesiredangle(neck, -math.pi/4), 0, 0)
+		rootjoint.Transform = CFrame.new(0, 0, -0.25) * CFrame.Angles(rig.solveanimationconstraintdesiredangle(rootjoint, math.pi/4), 0, 0)
 	else
-		neck.MaxVelocity = 0.5
-		rootjoint.MaxVelocity = 0.5
+		neck:SetAttribute(rig.maxvelocityflag, 0.5)
+		rootjoint:SetAttribute(rig.maxvelocityflag, 0.5)
 		addhipangle = 0
-		neck.Transform = CFrame.Angles(rig.solvemotordesiredangle(neck, 0), 0, 0)
-		rootjoint.Transform = CFrame.Angles(rig.solvemotordesiredangle(rootjoint, 0), 0, 0)
+		neck.Transform = CFrame.Angles(rig.solveanimationconstraintdesiredangle(neck, 0), 0, 0)
+		rootjoint.Transform = CFrame.Angles(rig.solveanimationconstraintdesiredangle(rootjoint, 0), 0, 0)
 	end
   
 	if (locomotion == "fall") then
-		rightshoulder.MaxVelocity = 0.5
-		leftshoulder.MaxVelocity = 0.5
+		rightshoulder:SetAttribute(rig.maxvelocityflag, 0.5)
+		leftshoulder:SetAttribute(rig.maxvelocityflag, 0.5)
 
 		if (crouched) then
 			local approxangle = 0.1 * math.sin(elapsed * 1)
@@ -548,8 +653,8 @@ function rig.stepmotors(
 		amplitude = 0.1
 		frequency = 1
 	else
-		rightshoulder.MaxVelocity = 0.15
-		leftshoulder.MaxVelocity = 0.15
+		rightshoulder:SetAttribute(rig.maxvelocityflag, 0.15)
+		leftshoulder:SetAttribute(rig.maxvelocityflag, 0.15)
 		amplitude = 1 * (crouched and 0.5 or 1)
 		frequency = (freq and freq or 9) * (crouched and 0.5 or 1) --- [6, 9, 12]
 	end
