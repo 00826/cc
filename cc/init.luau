@@ -424,12 +424,14 @@ function cc.step(character: typeof(cc.create()), dt: number)
 	local vertical = input.inputup - input.inputdown
 
 	--- jump
+	local floatvector = Vector3.zero
 	if input.inputup == 1 then
 		local lv = rootpart.AssemblyLinearVelocity
 		if floor then
 			rootpart.AssemblyLinearVelocity = Vector3.new(lv.X, input.jumppower * input.jumpmodifier, lv.Z)
 		else
-			rootpart:ApplyImpulse(Vector3.yAxis * input.floatpower * input.floatmodifier * dt)
+			floatvector = Vector3.yAxis * input.floatpower * input.floatmodifier
+			--- rootpart:ApplyImpulse((Vector3.yAxis * input.floatpower * input.floatmodifier * dt))
 		end
 	end
 	
@@ -460,12 +462,16 @@ function cc.step(character: typeof(cc.create()), dt: number)
 	local velocity = truevector * input.speed * input.speedmodifier * math.clamp(len, 0, 1)
 	if isflying then
 		bodyvelocity.MaxForce = input.bodyvelocitymaxforce * input.bodyvelocitymaxforcemodifier
+		bodyvelocity.Velocity = velocity
 	else
-		bodyvelocity.MaxForce = input.bodyvelocitymaxforce * Vector3.new(1, 0, 1) * input.bodyvelocitymaxforcemodifier
+		local maxforce = input.bodyvelocitymaxforce * Vector3.new(1, 0, 1) * input.bodyvelocitymaxforcemodifier
+		if floatvector ~= Vector3.zero then 
+			maxforce += floatvector
+		end
+		
+		bodyvelocity.MaxForce = maxforce
+		bodyvelocity.Velocity = velocity + floatvector
 	end
-
-	--- bodyvelocity.P = input.bodyvelocityp
-	bodyvelocity.Velocity = velocity
 
 	--- resolve locomotion
 	local locomotion = nil

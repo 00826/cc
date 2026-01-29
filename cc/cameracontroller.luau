@@ -37,6 +37,9 @@ local cameracontroller = {
 	--- original value: `Vector3.new(1.75, 0, 0)`
 	cameraoffset = Vector3.new(0, 0, 0);
 
+	--- shake value, written externally
+	camerashake = Vector3.zero;
+
 	--- camera distance extrapolator
 	extrapolator = transformextrapolator.create();
 	--- camera distance focus rotation
@@ -257,7 +260,7 @@ function cameracontroller.step(dt: number)
 	end
 
 	--- finalize camera cframe
-	realcframe = limitedcframe
+	realcframe = limitedcframe + cameracontroller.camerashake
 
 	--- apply camera cframes
 	camera.CFrame = realcframe
@@ -617,6 +620,9 @@ if RunService:IsClient() then
 		local maxdistance = cameracontroller.cameramaxzoomdistance
 		local defaultzoomdistance = math.clamp(cameracontroller.defaultzoomdistance, mindistance, maxdistance)
 		cameracontroller.currentzoomdistance = defaultzoomdistance
+
+		--- rotate camera
+		cameracontroller.camera.CFrame = CFrame.Angles(math.rad(15), 0, 0)
 
 		--- write defaults to spring
 		local s = cameracontroller.zoomspring

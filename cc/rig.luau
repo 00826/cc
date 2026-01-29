@@ -514,7 +514,7 @@ end
 --- toggles enabled property of constraints in rig and sets limb cancollide \
 --- `"animationconstraint"` for non-ragdoll \
 --- `"ballsocketconstraint"` for radgoll
-function rig.setactiveconstraints(r: typeof(rig.create()), activeconstraint: "animationconstraint"|"ballsocketconstraint")
+function rig.setactiveconstraints(r: typeof(rig.create()), activeconstraint: "animationconstraint"|"ballsocketconstraint", blacklist: {string}?)
 	for name: any, entry: any in rig.limbs do
 		local limb = r:FindFirstChild(name)
 		--- cancollide
@@ -529,6 +529,8 @@ function rig.setactiveconstraints(r: typeof(rig.create()), activeconstraint: "an
 
 	--- constraints
 	for _, thing in r:QueryDescendants("AnimationConstraint, BallSocketConstraint") do
+		if blacklist and table.find(blacklist, thing.Name) then continue end
+
 		if thing:IsA("AnimationConstraint") then
 			thing.Enabled = activeconstraint == "animationconstraint"
 		elseif thing:IsA("BallSocketConstraint") then
