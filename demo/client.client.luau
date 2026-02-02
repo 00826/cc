@@ -65,12 +65,24 @@ camera.FieldOfView = 90
 local jumpkeys = { Enum.KeyCode.Space, Enum.KeyCode.ButtonA }
 local crouchkeys = { Enum.KeyCode.LeftControl, Enum.KeyCode.RightControl, Enum.KeyCode.ButtonB }
 
+local lastjumpinput = 0
+local flyactivatetimems = 200
+
 local function inputbegan(inputobject: InputObject, sunk: boolean)
 	if sunk then return end
 	local keycode = inputobject.KeyCode
 
 	if table.find(jumpkeys, keycode) then
 		ccinput.inputup = 1
+		
+		--- simple double-tap detect
+		local now = os.clock()
+		if (now - lastjumpinput) * 1000 < flyactivatetimems then
+			ccinput.flying = not ccinput.flying
+			lastjumpinput = 0
+		end
+
+		lastjumpinput = os.clock()
 	elseif table.find(crouchkeys, keycode) then
 		ccinput.inputdown = 1
 	end
@@ -154,38 +166,40 @@ local function step(dt: number)
 	vector.lerp(cameracontroller.camerashakeoffset::any, Vector3.zero::any, i)
 	vector.lerp(cameracontroller.camerashakerotation::any, Vector3.zero::any, i)
 
-	--- if crouching (and not flying), scale speed by 0.5
-	if ccinput.inputdown == 1 then
-		if ccinput.flying then
-			ccinput.speedmodifier = 1
-		else
-			ccinput.speedmodifier = 0.5
-		end
+	--- if flying, scale speed by 2
+	--- otherwise scale speed by 0.5 if crouched or 1 if nothing else
+	if ccinput.flying == true then
+		ccinput.speedmodifier = 2
 	else
-		ccinput.speedmodifier = 1
+		if ccinput.inputdown == 1 then
+			ccinput.speedmodifier = 0.5
+		else
+			ccinput.speedmodifier = 1
+		end
 	end
 
 	--- early return if character doesn't exist
 	local character = localplayer.Character
 	if not character then return end
 
+	--- commented-out for flying input
 	--- if character is below y -2, enter "flying" state
 	--- in this case is a pseudo-swimming state
 	--- when exiting y -2, apply linear velocity as a free jump/emerge-from-water impulse
-	local pivot = character:GetPivot()
-	if pivot.Y < -2 then
-		ccinput.flying = true
-		ccinput.bodyvelocitymaxforcemodifier = 1
-		lastflystate = 1
-	else
-		ccinput.flying = false
-		ccinput.bodyvelocitymaxforcemodifier = 1
-		if lastflystate ~= 0 then
-			lastflystate = 0
-			local lv = character.PrimaryPart.AssemblyLinearVelocity
-			character.PrimaryPart.AssemblyLinearVelocity = Vector3.new(lv.X, 60, lv.Z)
-		end
-	end
+	--- local pivot = character:GetPivot()
+	--- if pivot.Y < -2 then
+	--- 	ccinput.flying = true
+	--- 	ccinput.bodyvelocitymaxforcemodifier = 1
+	--- 	lastflystate = 1
+	--- else
+	--- 	ccinput.flying = false
+	--- 	ccinput.bodyvelocitymaxforcemodifier = 1
+	--- 	if lastflystate ~= 0 then
+	--- 		lastflystate = 0
+	--- 		local lv = character.PrimaryPart.AssemblyLinearVelocity
+	--- 		character.PrimaryPart.AssemblyLinearVelocity = Vector3.new(lv.X, 60, lv.Z)
+	--- 	end
+	--- end
 
 	local limbsvisible = true
 
@@ -256,6 +270,11 @@ local function step(dt: number)
 	)
 	--- write state
 	replication.writestate(r, ccoutput.state)
+
+	--- if flying and floor is not nil, set flying to false
+	if ccinput.flying == true and ccoutput.floor ~= nil then
+		ccinput.flying = false
+	end
 
 	debug.profileend()
 end
@@ -442,7 +461,7 @@ local function animate(dt: number)
 		end
 
 		--- resolve rotations for strafing animation
-		local ix, iy = replication.readinput(resync)
+		local ix, iy, iz = replication.readinput(resync)
 		local xsign
 		if islocal then
 			xsign = inputcontroller.vector.X
@@ -467,10 +486,19 @@ local function animate(dt: number)
 
 		--- procedural animationconstraint animation wrt elapsed (os.clock())
 		if animatethisframe then
+			local statestring = replication.statetostring(replication.readstate(resync))::any
+			if statestring == "fly" then
+				if ix == 0 and iz == 0 then
+					statestring = "idle"
+				else
+					statestring = "walk"
+				end
+			end
+
 			task.defer(
 				rig.stepanimationconstraints,
 				playerrig,
-				replication.statetostring(replication.readstate(resync))::any,
+				statestring::any,
 				iy == 2 or iy == 3 or false,
 				"none"::any,
 				os.clock()
