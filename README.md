@@ -33,7 +33,11 @@ cc.replication controls the server-side of cc's replication
 
 because of this some annotations are on the more verbose side hopefully for better clarity. also for some variables used in the playermodule rewrite i have tried to include their original variable name so it's easier to trace where something came from
 
-4. vr is not supported (no vr headset T_T), but will most definitely be added when i have the means to do so
+4. mobile thumbstick is provided ootb, mobile jump button is not
+
+this is because most games have developer-prescribed jump buttons (but not a thumbstick of the same nature) and i do not want cc to conflict with that piece of screen real estate
+
+5. vr is not supported (no vr headset T_T), but will most definitely be added when i have the means to do so
 
 ## interfacing
 
