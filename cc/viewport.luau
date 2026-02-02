@@ -2,7 +2,11 @@
 
 local RunService = game:GetService("RunService")
 
-type extrapolatestepresult = typeof(require(script.Parent:WaitForChild("transformextrapolator")).step(...))
+type extrapolatestepresult = {
+	extrapolate: (number) -> CFrame;
+	translationvelocity: Vector3;
+	rotationvelocity: Vector3;
+}
 
 --- ### viewport.luau
 ---
@@ -169,13 +173,13 @@ function viewport.queryviewport(focus: CFrame, distance: number)
 				viewportsize.Y*viewY
 			).Origin
 
-			local softPointLimit, hardPointLimit = viewport.querypoint(origin, focuslookvector, distance, lastpos)
+			local softpointlimit, hardpointlimit = viewport.querypoint(origin, focuslookvector, distance, lastpos)
 
-			if hardPointLimit < hardboxlimit then
-				hardboxlimit = hardPointLimit
+			if hardpointlimit < hardboxlimit then
+				hardboxlimit = hardpointlimit
 			end
-			if softPointLimit < softboxlimit then
-				softboxlimit = softPointLimit
+			if softpointlimit < softboxlimit then
+				softboxlimit = softpointlimit
 			end
 		end
 	end
@@ -196,17 +200,17 @@ function viewport.testpromotion(focus: CFrame, distance: number, extrapolatestep
 		--- Dead reckoning the camera rotation and focus
 		debug.profilebegin("cc_extrapolate")
 
-		local SAMPLE_DT = 0.0625
-		local SAMPLE_MAX_T = 1.25
+		local sampledeltatime = 0.0625
+		local samplemaxtime = 1.25
 
 		local translationvelocity = extrapolatestepresult.translationvelocity
 		local rotationvelocity = extrapolatestepresult.rotationvelocity
 
-		local maxDist = (viewport.getcollisionpoint(focusposition, translationvelocity*SAMPLE_MAX_T) - focusposition).Magnitude
+		local maxdistance = (viewport.getcollisionpoint(focusposition, translationvelocity*samplemaxtime) - focusposition).Magnitude
 		--- Metric that decides how many samples to take
-		local combinedSpeed = vector.magnitude(translationvelocity::any)
+		local combinedspeed = vector.magnitude(translationvelocity::any)
 
-		for dt = 0, math.min(SAMPLE_MAX_T, vector.magnitude(rotationvelocity::any) + maxDist/combinedSpeed), SAMPLE_DT do
+		for dt = 0, math.min(samplemaxtime, vector.magnitude(rotationvelocity::any) + maxdistance/combinedspeed), sampledeltatime do
 			local extrapolatedcframewrtdt = extrapolatestepresult.extrapolate(dt) --- Extrapolated CFrame at time dt
 
 			if viewport.querypoint(extrapolatedcframewrtdt.Position, -extrapolatedcframewrtdt.LookVector, distance) >= distance then

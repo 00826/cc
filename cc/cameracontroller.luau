@@ -9,9 +9,118 @@ local ContextActionService = game:GetService("ContextActionService")
 local UserGameSettings = UserSettings():GetService("UserGameSettings")
 local UserInputService = game:GetService("UserInputService")
 
-local viewport = require(script.Parent:WaitForChild("viewport"))
-local spring = require(script.Parent:WaitForChild("spring"))
-local transformextrapolator = require(script.Parent:WaitForChild("transformextrapolator"))
+local viewport = require(script.Parent.viewport)
+
+--- creates a spring
+-- @native
+function createspring(frequency: number, distance: number, mindistance: number, maxdistance: number)
+	distance = math.clamp(distance, mindistance, maxdistance)
+	return {
+		frequency = frequency;
+		
+		velocity = 0;
+
+		distance = distance;
+		goal = distance;
+
+		mindistance = mindistance;
+		maxdistance = maxdistance;
+	}
+end
+
+--- advances spring by `dt`
+-- @native
+function springstep(s: typeof(createspring(...)), dt: number)
+	local freq = s.frequency * 2 * math.pi --- Convert from Hz to rad/s
+	local distance = s.distance
+	local velocity = s.velocity
+	local mindistance = s.mindistance
+	local maxdistance = s.maxdistance
+	local goal = s.goal
+
+	--- Solve the spring ODE for position x and velocity after time t, assuming critical damping:
+	--- 2*f*x'[t] + x''[t] = f^2*(g - x[t])
+	--- Knowns are x[0] and x'[0].
+	--- Solve for x[t] and x'[t].
+
+	local offset = goal - distance
+	local step = freq*dt
+	local decay = math.exp(-step)
+
+	local x1 = goal + (velocity*dt - offset*(step + 1))*decay
+	local v1 = ((offset*freq - velocity)*step + velocity)*decay
+
+	--- Constrain
+	if x1 < mindistance then
+		x1 = mindistance
+		v1 = 0
+	elseif x1 > maxdistance then
+		x1 = maxdistance
+		v1 = 0
+	end
+
+	s.distance = x1
+	s.velocity = v1
+
+	return x1
+end
+
+local function cframetoaxis(cframe: CFrame)
+	local axis, angle = cframe:ToAxisAngle()
+
+	return axis * angle
+end
+
+local function axistocframe(axis: Vector3)
+	local angle = vector.magnitude(axis::any)
+	if angle > 1e-5 then
+		return CFrame.fromAxisAngle(axis, angle)
+	end
+
+	return CFrame.identity
+end
+
+--- creates a transform extrapolator
+function createtransformextrapolator()
+	return {
+		lastcframe = nil :: CFrame?;
+	}
+end
+
+--- advances transform extrapolator `t` by `dt` wrt `cframe`, returning a table with translation/rotation velocities and an extrapolator function
+function transformextrapolatorstep(t: typeof(createtransformextrapolator()), dt: number, cframe: CFrame)
+	local lastcframe = t.lastcframe or cframe
+	t.lastcframe = cframe
+
+	local position = cframe.Position
+	local rotation = cframe.Rotation
+
+	local lastposition = lastcframe.Position
+	local lastrotation = lastcframe.Rotation
+
+	--- Estimate velocities from the delta between now and the last frame
+	--- This estimation can be a little noisy.
+	local translationvelocity = (position - lastposition)/dt
+	local rotationvelocity = cframetoaxis(rotation*lastrotation:Inverse())/dt
+
+	local function extrapolate(t: number)
+		local thisposition = translationvelocity*t + position
+		local thisrotation = axistocframe(rotationvelocity*t)*rotation
+
+		return thisrotation + thisposition
+	end
+
+	return {
+		extrapolate = extrapolate,
+		translationvelocity = translationvelocity,
+		rotationvelocity = rotationvelocity,
+	}
+end
+
+--- resets transform extrapolator
+function transformextrapolatorreset(t: typeof(createtransformextrapolator()))
+	t.lastcframe = nil
+end
 
 --- ### cameracontroller.luau
 ---
@@ -37,11 +146,15 @@ local cameracontroller = {
 	--- original value: `Vector3.new(1.75, 0, 0)`
 	cameraoffset = Vector3.new(0, 0, 0);
 
-	--- shake value, written externally
-	camerashake = Vector3.zero;
+	--- shake values, written externally
+	--- shake offset
+	camerashakeoffset = Vector3.zero;
+	--- shake rotation, components are in radians. is a vector for speed
+	--- is converted to `CFrame.fromOrientation(...)` when cameracontroller is stepped
+	camerashakerotation = Vector3.zero;
 
 	--- camera distance extrapolator
-	extrapolator = transformextrapolator.create();
+	extrapolator = createtransformextrapolator();
 	--- camera distance focus rotation
 	focusrotation = CFrame.new(
 		0, 0, 0,
@@ -127,7 +240,7 @@ local cameracontroller = {
 	laststep = 0;
 
 	--- default distance away from subject
-	defaultzoomdistance = 12.5;
+	defaultzoomdistance = game:GetService("StarterPlayer").CameraMaxZoomDistance; --- 12.5
 	--- current zoom distance from subject
 	currentzoomdistance = 0;
 
@@ -137,7 +250,7 @@ local cameracontroller = {
 	zoomspringacceleration = 0.0375;
 
 	--- internal camera spring
-	zoomspring = spring.create(0, 0, 0, 0);
+	zoomspring = createspring(0, 0, 0, 0);
 
 	--- zoom sensitivity curve
 	zoomsensitivitycurve = 0.5;
@@ -211,9 +324,20 @@ function cameracontroller.step(dt: number)
 	local zoomspring = cameracontroller.zoomspring
 	zoomspring.goal = cameracontroller.currentzoomdistance
 
+	--- instant snap
+	--- if zoominput ~= 0 then
+	--- 	if zoominput < 0 then
+	--- 		cameracontroller.currentzoomdistance = cameracontroller.cameraminzoomdistance
+	--- 		zoomspring.goal = cameracontroller.cameraminzoomdistance
+	--- 	else
+	--- 		cameracontroller.currentzoomdistance = cameracontroller.cameramaxzoomdistance
+	--- 		zoomspring.goal = cameracontroller.cameramaxzoomdistance
+	--- 	end
+	--- end
+
 	--- poppercam here to set maxvalue
 	
-	local zoomdistance = spring.step(zoomspring, realtime)
+	local zoomdistance = springstep(zoomspring, realtime)
 
 	--- resolve rotations
 	local rotateinput = cameracontroller.getrotationinput(realtime)
@@ -247,7 +371,7 @@ function cameracontroller.step(dt: number)
 			local extrapolator = cameracontroller.extrapolator
 			local rotatedfocus = CFrame.lookAlong(realfocus.Position, -realcframe.LookVector) * cameracontroller.focusrotation
 
-			local extrapolationresult = transformextrapolator.step(extrapolator, realtime, rotatedfocus)
+			local extrapolationresult = transformextrapolatorstep(extrapolator, realtime, rotatedfocus)
 			limitedzoom = viewport.cast(realfocus * CFrame.new(0, 0, minpossiblezoom), maxpossiblezoom - minpossiblezoom, extrapolationresult) + minpossiblezoom
 			
 			limitedcframe = rotatedfocus * CFrame.new(0, 0, limitedzoom)
@@ -260,7 +384,10 @@ function cameracontroller.step(dt: number)
 	end
 
 	--- finalize camera cframe
-	realcframe = limitedcframe + cameracontroller.camerashake
+	local shakerotation = cameracontroller.camerashakerotation
+	local shakerotationcframe = CFrame.fromOrientation(shakerotation.X, shakerotation.Y, shakerotation.Z)
+	
+	realcframe = (limitedcframe + cameracontroller.camerashakeoffset) * shakerotationcframe
 
 	--- apply camera cframes
 	camera.CFrame = realcframe
@@ -283,6 +410,14 @@ function cameracontroller.gamepadzoomstep(delta: number)
 
 	cameracontroller.currentgamepadzoomstep = currentstep
 	cameracontroller.currentzoomdistance = math.map(currentstep, 1, maxsteps, cameracontroller.cameraminzoomdistance, cameracontroller.cameramaxzoomdistance)
+	
+	--- if cameracontroller.currentzoomdistance <= cameracontroller.cameraminzoomdistance then
+	--- 	cameracontroller.currentzoomdistance = cameracontroller.cameramaxzoomdistance
+	--- 	cameracontroller.zoomspring.goal = cameracontroller.cameramaxzoomdistance
+	--- else
+	--- 	cameracontroller.currentzoomdistance = cameracontroller.cameraminzoomdistance
+	--- 	cameracontroller.zoomspring.goal = cameracontroller.cameraminzoomdistance
+	--- end
 end
 
 --- advances internal currentzoomdistance by zoominput
@@ -678,7 +813,7 @@ if RunService:IsClient() then
 		s.mindistance = mindistance
 		s.maxdistance = maxdistance
 
-		spring.step(s, 1/60)
+		springstep(s, 1/60)
 	end
 
 	--- min/max zoom distance change

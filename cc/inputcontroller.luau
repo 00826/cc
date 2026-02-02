@@ -81,15 +81,15 @@ local inputcontroller = {
 
 	--- `inputvector = Vector3.new(t[1] + t[2], 0, t[3] + t[4])`
 	keyboardsigns = table.create(4, 0);
-	--- `Enum.KeyCode -> { Offset: number; Sign: number; }` conversion table
+	--- `Enum.KeyCode -> { offset: number; sign: number; }` conversion table
 	keyboardmap = {
-		[Enum.KeyCode.W] = { Offset = 1; Sign = -1; };
-		[Enum.KeyCode.S] = { Offset = 2; Sign = 1; };
-		[Enum.KeyCode.A] = { Offset = 3; Sign = -1; };
-		[Enum.KeyCode.D] = { Offset = 4; Sign = 1; };
+		[Enum.KeyCode.W] = { offset = 1; sign = -1; };
+		[Enum.KeyCode.S] = { offset = 2; sign = 1; };
+		[Enum.KeyCode.A] = { offset = 3; sign = -1; };
+		[Enum.KeyCode.D] = { offset = 4; sign = 1; };
 
-		[Enum.KeyCode.Up] = { Offset = 1; Sign = -1; };
-		[Enum.KeyCode.Down] = { Offset = 2; Sign = 1; };
+		[Enum.KeyCode.Up] = { offset = 1; sign = -1; };
+		[Enum.KeyCode.Down] = { offset = 2; sign = 1; };
 	};
 
 	--- gamepad L3 deadzone
@@ -206,7 +206,7 @@ function inputcontroller.keyboard(action: string, state: Enum.UserInputState, in
 		[4] = right
 	}]]
 	local keysigns = inputcontroller.keyboardsigns
-	keysigns[entry.Offset] = (state == Enum.UserInputState.Begin) and entry.Sign or 0
+	keysigns[entry.offset] = (state == Enum.UserInputState.Begin) and entry.sign or 0
 
 	if state == Enum.UserInputState.Cancel then
 		inputcontroller.vector = Vector3.zero

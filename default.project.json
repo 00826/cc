@@ -2,11 +2,23 @@
 	"name": "cc",
 	"tree": {
 		"$className": "DataModel",
+		"ReplicatedFirst": {
+			"$className": "ReplicatedFirst",
+			"$ignoreUnknownInstances": true,
+			
+			"client": {"$path": "demo/client.client.luau"}
+		},
 		"ReplicatedStorage": {
 			"$className": "ReplicatedStorage",
 			"$ignoreUnknownInstances": true,
 			
 			"cc": { "$path": "cc" }
+		},
+		"ServerScriptService": {
+			"$className": "ServerScriptService",
+			"$ignoreUnknownInstances": true,
+			
+			"server": {"$path": "demo/server.server.luau"}
 		}
 	}
 }

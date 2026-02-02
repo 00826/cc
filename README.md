@@ -25,15 +25,15 @@ this is because cc uses a minimal rewrite/functionality of the roblox `PlayerMod
 }
 ```
 
-2. cc must be required on the server and client
+2. [cc.replication.luau](cc/replication.luau) must be required on the server
 
-this is because cc has a self-contained replication process
+cc.replication controls the server-side of cc's replication
 
 3. i do not know how to write comprehensive or proper documentation for a project of this nature
 
 because of this some annotations are on the more verbose side hopefully for better clarity. also for some variables used in the playermodule rewrite i have tried to include their original variable name so it's easier to trace where something came from
 
-4. vr is not supported (no vr headset sob)
+4. vr is not supported (no vr headset T_T), but will most definitely be added when i have the means to do so
 
 ## interfacing
 
@@ -43,25 +43,31 @@ because of this some annotations are on the more verbose side hopefully for bett
 
 `cc.step()` works best when bound to `RunService.Heartbeat`, as binding it to renderstep at any renderpriority causes character jitter and binding it to stepped causes characters to fling when jumping
 
-## the rewritten playermodule
+## general script overview
 
 [cc/cameracontroller.luau](cc/cameracontroller.luau) \
 [cc/inputcontroller.luau](cc/inputcontroller.luau) \
 [cc/viewport.luau](cc/viewport.luau) \
-[cc/spring.luau](cc/spring.luau) \
-[cc/transformextrapolator.luau](cc/transformextrapolator.luau) \
 ...are parts of a minimal rewrite of roblox's `PlayerModule`
 
 [cc/cameracontroller.luau](cc/cameracontroller.luau) controls the camera based on inputs read from [cc/inputcontroller.luau](cc/inputcontroller.luau) \
-[cc/viewport.luau](cc/viewport.luau) is the equivalent of the playermodule poppercam and queries the camera viewport in order to artificially limit camera zoom distance \
-[cc/spring.luau](cc/spring.luau) is a de-ooped spring module found in the playermodule camerautils \
-[cc/transformextrapolator.luau](cc/transformextrapolator.luau) is a de-ooped cframe extrapolator found in the playermodule poppercam
+[cc/viewport.luau](cc/viewport.luau) is the equivalent of the playermodule poppercam and queries the camera viewport in order to artificially limit camera zoom distance
+
+[cc/interpolation.luau](cc/interpolation.luau) is a general solver for interpolating replicated characters, intended for external use. a general use pattern is provided in the client demo script \
+[cc/replication.luau](cc/replication.luau) controls the character replication between clients using heavily space-optimized buffers
+
+[demo/client.client.luau](demo/client.client.luau) contains a general use pattern for cc, and is the script used in the demo game (linked below) \
+[demo/server.server.luau](demo/server.server.luau) satisfies `gotcha #2`
 
 ## fast rig setup
 
-[cc/rig.luau](cc/rig.luau) is a minimal motor6d-basepart-animationcontroller rig constructor/mutator meant to create rigs that are visually identical to humanoid r6 rigs without the humanoid bloat
+[cc/rig.luau](cc/rig.luau) creates rigs from pure tables and comes with a r6 preset without humanoid bloat
 
 [cc-rig-unwrap.png](cc-rig-unwrap.png) is a blank clothing template for the default limbs found in `cc/rig.luau` (torso, left arm, left leg, right arm, right leg)
+
+## demo game
+
+
 
 ---
 
