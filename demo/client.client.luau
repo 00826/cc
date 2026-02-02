@@ -112,6 +112,31 @@ UserInputService.InputChanged:Once(function()
 	iswindowfocused = true
 end)
 
+--- function to hide limbs when in first-person
+--- ideally this would be handled by a transparencycontroller
+--- which isn't included in this demo for the sake of simplicity
+local hiddenlimbs = {
+	"Head";
+	"Torso";
+	"RightArm";
+	"LeftArm";
+	"RightLeg";
+	"LeftLeg";
+	"Sphere";
+}
+
+local function updatelimbtransparency(visible: boolean)
+	local character = localplayer.Character
+	if character then
+		for _, thing in character:QueryDescendants("BasePart") do
+			assert(thing:IsA("BasePart"))
+			if table.find(hiddenlimbs, thing.Name) then
+				thing.LocalTransparencyModifier = visible and 0 or 1
+			end
+		end
+	end
+end
+
 --- cc step
 
 local function step(dt: number)
@@ -162,6 +187,8 @@ local function step(dt: number)
 		end
 	end
 
+	local limbsvisible = true
+
 	--- resolve mousebehavior
 	local mousebehavior = Enum.MouseBehavior.Default
 	if cameracontroller.cameratype == Enum.CameraType.Scriptable then
@@ -175,14 +202,17 @@ local function step(dt: number)
 		cameracontroller.cameraoffset = Vector3.zero
 		ccinput.rotationtype = Enum.RotationType.CameraRelative
 		UserInputService.MouseIcon = "rbxasset://textures/cursors/CrossMouseIcon.png"
+		limbsvisible = false
 	else
 		--- third-person
 		mousebehavior = Enum.MouseBehavior.LockCenter
 		cameracontroller.cameraoffset = Vector3.new(0, 0, 0)
-		--- cameracontroller.cameraoffset = Vector3.new(1.75 * shiftlockvectorsign, 0.25, 0)
 		ccinput.rotationtype = Enum.RotationType.MovementRelative
 		UserInputService.MouseIcon = "rbxasset://textures/cursors/CrossMouseIcon.png"
+		limbsvisible = true
 	end
+
+	updatelimbtransparency(limbsvisible)
 
 	--- extra mousebehavior cases
 	if UserInputService.TouchEnabled then

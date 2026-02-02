@@ -62,12 +62,11 @@ because of this some annotations are on the more verbose side hopefully for bett
 ## fast rig setup
 
 [cc/rig.luau](cc/rig.luau) creates rigs from pure tables and comes with a r6 preset without humanoid bloat
-
 [cc-rig-unwrap.png](cc-rig-unwrap.png) is a blank clothing template for the default limbs found in `cc/rig.luau` (torso, left arm, left leg, right arm, right leg)
 
 ## demo game
 
-
+[https://www.roblox.com/games/104949334668691/cc-demo](https://www.roblox.com/games/104949334668691/cc-demo)
 
 ---
 
