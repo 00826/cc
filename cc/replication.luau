@@ -121,13 +121,11 @@ function replication.writerotation(r: buffer, rx: number?, ry: number?)
 	end
 end
 
---- reads rotation from replication buffer (`CFrame.fromOrientation()`, YXZ)
+--- reads rotation x,y from replication buffer
 function replication.readrotation(r: buffer)
-	return CFrame.fromOrientation(
+	return
 		math.map(buffer.readu8(r, 9), 0, 255, -math.pi, math.pi),
-		math.map(buffer.readu8(r, 10), 0, 255, -math.pi, math.pi),
-		0
-	)
+		math.map(buffer.readu8(r, 10), 0, 255, -math.pi, math.pi)
 end
 
 --- writes input x,y,z to replication buffer \
@@ -159,7 +157,7 @@ function replication.writestate(r: buffer, state: number)
 end
 
 --- reads state from replication buffer
-function replication.readstate(r: buffer, state: number)
+function replication.readstate(r: buffer)
 	return buffer.readbits(r, 94, 2)
 end
 
@@ -168,12 +166,59 @@ function replication.statetostring(state: number)
 	return replication.states[state + 1]
 end
 
+--- returns zero-indexed state from its equivalent string representation (`table.find(replication.states, s) - 1`)
 function replication.statefromstring(s: string)
 	local index = table.find(replication.states, s)
 	if index then
 		return index - 1
 	else
 		return 0
+	end
+end
+
+--- converts signed integer to unsigned bits \
+--- `- -> 2` \
+--- `0 -> 0` \
+--- `+ -> 1`
+function replication.signedtobits(x: number)
+	return x < 0 and 2
+		or x > 0 and 1
+		or 0
+end
+
+--- converts unsigned bits to a signed integer \
+--- `2 -> -1` \
+--- `1 -> 1` \
+--- `0 -> 0`
+function replication.bitstosigned(x: number)
+	return x == 2 and -1
+		or x == 1 and 1
+		or 0
+end
+
+--- converts up/down input to unsigned bits
+--- `0, 0 -> 0` \
+--- `1, 0 -> 1` \
+--- `0, 1 -> 2` \
+--- `1, 1 -> 3`
+function replication.updowntobits(up: number, down: number)
+	return up == 0 and down == 0 and 0
+		or up == 1 and down == 0 and 1
+		or up == 0 and down == 1 and 2
+		or up == 1 and down == 1 and 3
+		or 0
+end
+
+--- converts unsigned bits to signed integers
+function replication.bitstoupdown(x: number)
+	if x == 3 then
+		return 1, 1
+	elseif x == 2 then
+		return 0, 1
+	elseif x == 1 then
+		return 1, 0
+	else
+		return 0, 0
 	end
 end
 

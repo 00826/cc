@@ -103,12 +103,15 @@ local cc = {
 		bodygyrop = 100000;
 	};
 	output = {
+		--- position of character stepped by `cc.step()`
+		position = Vector3.zero;
+		--- camera rotation x/y
+		rotationx = 0;
+		rotationy = 0;
 		--- floor, if found, of character stepped by `cc.step()`
 		floor = nil :: RaycastResult?;
-		--- cframe of character stepped by `cc.step()`
-		cframe = CFrame.identity;
-		--- locomotion state
-		locomotion = 0;
+		--- state
+		state = 0;
 		--- world-relative move vector
 		truevector = Vector3.zero;
 	};
@@ -120,22 +123,30 @@ local cc = {
 
 	sphere = script:WaitForChild("Sphere");
 	spheremeshid = "rbxassetid://122701517143775"; --- break glass in case of rojo
-	spherecollisionfidelity = Enum.CollisionFidelity.Hull --- break glass in case of rojo
+	spherecollisionfidelity = Enum.CollisionFidelity.Hull; --- break glass in case of rojo
+
+	spheretransparency = 2/3; --- 1
+	roottransparency = 1; --- 1
 }
 
 --- creates new character
 function cc.create()
 	local character = Instance.new("Model")
-	--- sphere
+	--- sphere & associated attachment
 	local sphere = cc.sphere:Clone()
 	sphere.Name = "Sphere"
+	sphere.Transparency = cc.spheretransparency
 	sphere.Parent = character
+	local sphereattachment = Instance.new("Attachment")
+	sphereattachment.Name = "SphereAttachment1"
+	sphereattachment.CFrame = CFrame.identity
+	sphereattachment.Parent = sphere
 
-	--- rootpart
+	--- rootpart & associated attachment
 	local rootpart = Instance.new("Part")
 	rootpart.Name = "RootPart"
 	rootpart.CastShadow = false
-	rootpart.Transparency = 1
+	rootpart.Transparency = cc.roottransparency
 	rootpart.Anchored = false
 	rootpart.CanCollide = false
 	rootpart.CanQuery = false
@@ -143,10 +154,14 @@ function cc.create()
 	rootpart.Massless = false
 	rootpart.Size = Vector3.new(2, 2, 2)
 	rootpart.Parent = character
+	--- local rootattachment = Instance.new("Attachment")
+	--- rootattachment.Name = "RootAttachment1"
+	--- rootattachment.CFrame = CFrame.identity
+	--- rootattachment.Parent = rootpart
 
 	character.PrimaryPart = rootpart
 
-	--- head
+	--- head & associated attachment
 	local head = Instance.new("Part")
 	head.Name = "Head"
 	head.CastShadow = false
@@ -158,6 +173,10 @@ function cc.create()
 	head.Massless = true
 	head.Size = Vector3.new(1, 1, 1)
 	head.Parent = character
+	local headattachment = Instance.new("Attachment")
+	headattachment.Name = "HeadAttachment1"
+	headattachment.CFrame = CFrame.identity
+	headattachment.Parent = head
 	
 	do --- top/bottom attachments
 		local ta = Instance.new("Attachment")
@@ -171,31 +190,43 @@ function cc.create()
 		ba.Parent = rootpart
 	end
 
-	do --- motors
-		--- connects head to rootpart
-		local hj = Instance.new("Motor6D")
-		hj.Name = "HeadJoint"
-		hj.C0 = CFrame.new(Vector3.yAxis * 3.5)
-		hj.Part0 = rootpart
-		hj.Part1 = head
-		hj.Parent = rootpart
+	do --- head animationconstraint
+		local a0 = Instance.new("Attachment")
+		a0.Name = "HeadAttachment0"
+		a0.CFrame = CFrame.new(Vector3.yAxis * 3.5)
+		a0.Parent = rootpart
+		local ac = Instance.new("AnimationConstraint")
+		ac.Name = "HeadJoint"
+		ac.IsKinematic = true
+		ac.Attachment0 = a0
+		ac.Attachment1 = headattachment
+		ac.Parent = rootpart
+	end
 
-		--- connects developer-prescribed rig to rootpart
-		--- empty part1 intended to be set to the rootpart of an external rig
-		local rj = Instance.new("Motor6D")
-		rj.Name = "RigJoint"
-		rj.C0 = CFrame.new(Vector3.yAxis * 2)
-		rj.Part0 = rootpart
-		rj.Part1 = nil
-		rj.Parent = rootpart
+	do --- rig animationconstraint
+		local a0 = Instance.new("Attachment")
+		a0.Name = "RigAttachment0"
+		a0.CFrame = CFrame.new(Vector3.yAxis * 2)
+		a0.Parent = rootpart
+		local ac = Instance.new("AnimationConstraint")
+		ac.Name = "RigJoint"
+		ac.IsKinematic = true
+		ac.Attachment0 = a0
+		ac.Attachment1 = nil --- empty to be set by developer
+		ac.Parent = rootpart
+	end
 
-		--- connects sphere (pill mesh) to rootpart
-		local sj = Instance.new("Motor6D")
-		sj.Name = "SphereJoint"
-		sj.C0 = CFrame.new(Vector3.yAxis * 1.55)
-		sj.Part0 = rootpart
-		sj.Part1 = sphere
-		sj.Parent = rootpart
+	do --- rig animationconstraint
+		local a0 = Instance.new("Attachment")
+		a0.Name = "SphereAttachment0"
+		a0.CFrame = CFrame.new(Vector3.yAxis * 1.55)
+		a0.Parent = rootpart
+		local ac = Instance.new("AnimationConstraint")
+		ac.Name = "SphereJoint"
+		ac.IsKinematic = true
+		ac.Attachment0 = a0
+		ac.Attachment1 = sphereattachment
+		ac.Parent = rootpart
 	end
 
 	do --- movers
@@ -275,8 +306,6 @@ function cc.step(character: typeof(cc.create()), dt: number)
 	if not rootpart then return end
 	if not rootpart:IsA("BasePart") then return end
 
-	local cframe = rootpart.CFrame
-
 	local bodygyro = rootpart.BodyGyro
 	local bodyvelocity = rootpart.BodyVelocity
 
@@ -321,7 +350,6 @@ function cc.step(character: typeof(cc.create()), dt: number)
 	bodygyro.P = input.bodygyrop
 	bodygyro.CFrame = CFrame.identity
 
-	local rootcframe = CFrame.new(cframe.Position)
 	rootpart.AssemblyAngularVelocity = Vector3.zero
 
 	--- resolve bodyvelocity
@@ -340,25 +368,30 @@ function cc.step(character: typeof(cc.create()), dt: number)
 	end
 
 	--- resolve state
-	local statestring = nil
+	local state = 0
 	if isflying then
-		statestring = "fly"
+		state = 3 --- fly
 	else
 		if floor == nil then
-			statestring = "fall"
+			state = 2 --- fall
 		else
 			if ismoving then
-				statestring = "walk"
+				state = 1 --- walk
 			else
-				statestring = "idle"
+				state = 0 --- idle
 			end
 		end
 	end
 
 	--- update output
-	output.cframe = rootcframe * cameracframe.Rotation
+
+	local x, y = cameracframe:ToOrientation()
+
+	output.position = rootpart.Position
+	output.rotationx = x
+	output.rotationy = y
 	output.floor = floor
-	output.locomotion = cc.replication.statefromstring(statestring)
+	output.state = state
 	output.truevector = truevector
 end
 

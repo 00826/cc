@@ -244,6 +244,10 @@ local cameracontroller = {
 	--- current zoom distance from subject
 	currentzoomdistance = 0;
 
+	--- `snap`: zoom input instantly snaps between first and third-person perspective
+	--- `step`: zoom input steps between first and third-person perspective
+	zoombehavior = "step" :: "snap" | "step";
+
 	--- zoom spring frequency
 	zoomspringfrequency = 4.5;
 	--- zoom spring acceleration
@@ -322,18 +326,22 @@ function cameracontroller.step(dt: number)
 
 	--- resolve spring
 	local zoomspring = cameracontroller.zoomspring
-	zoomspring.goal = cameracontroller.currentzoomdistance
 
-	--- instant snap
-	--- if zoominput ~= 0 then
-	--- 	if zoominput < 0 then
-	--- 		cameracontroller.currentzoomdistance = cameracontroller.cameraminzoomdistance
-	--- 		zoomspring.goal = cameracontroller.cameraminzoomdistance
-	--- 	else
-	--- 		cameracontroller.currentzoomdistance = cameracontroller.cameramaxzoomdistance
-	--- 		zoomspring.goal = cameracontroller.cameramaxzoomdistance
-	--- 	end
-	--- end
+	if cameracontroller.zoombehavior == "step" then
+		zoomspring.goal = cameracontroller.currentzoomdistance
+	elseif cameracontroller.zoombehavior == "snap" then
+		if zoominput ~= 0 then
+			if zoominput < 0 then
+				cameracontroller.currentzoomdistance = cameracontroller.cameraminzoomdistance
+				zoomspring.goal = cameracontroller.cameraminzoomdistance
+			else
+				cameracontroller.currentzoomdistance = cameracontroller.cameramaxzoomdistance
+				zoomspring.goal = cameracontroller.cameramaxzoomdistance
+			end
+		end
+	else
+		warn(string.format("unknown zoombehavior '%s'", cameracontroller.zoombehavior))
+	end
 
 	--- poppercam here to set maxvalue
 	
@@ -408,16 +416,20 @@ function cameracontroller.gamepadzoomstep(delta: number)
 		currentstep = maxsteps
 	end
 
-	cameracontroller.currentgamepadzoomstep = currentstep
-	cameracontroller.currentzoomdistance = math.map(currentstep, 1, maxsteps, cameracontroller.cameraminzoomdistance, cameracontroller.cameramaxzoomdistance)
-	
-	--- if cameracontroller.currentzoomdistance <= cameracontroller.cameraminzoomdistance then
-	--- 	cameracontroller.currentzoomdistance = cameracontroller.cameramaxzoomdistance
-	--- 	cameracontroller.zoomspring.goal = cameracontroller.cameramaxzoomdistance
-	--- else
-	--- 	cameracontroller.currentzoomdistance = cameracontroller.cameraminzoomdistance
-	--- 	cameracontroller.zoomspring.goal = cameracontroller.cameraminzoomdistance
-	--- end
+	if cameracontroller.zoombehavior == "step" then
+		cameracontroller.currentgamepadzoomstep = currentstep
+		cameracontroller.currentzoomdistance = math.map(currentstep, 1, maxsteps, cameracontroller.cameraminzoomdistance, cameracontroller.cameramaxzoomdistance)
+	elseif cameracontroller.zoombehavior == "snap" then
+		if cameracontroller.currentzoomdistance <= cameracontroller.cameraminzoomdistance then
+			cameracontroller.currentzoomdistance = cameracontroller.cameramaxzoomdistance
+			cameracontroller.zoomspring.goal = cameracontroller.cameramaxzoomdistance
+		else
+			cameracontroller.currentzoomdistance = cameracontroller.cameraminzoomdistance
+			cameracontroller.zoomspring.goal = cameracontroller.cameraminzoomdistance
+		end
+	else
+		warn(string.format("unknown zoombehavior '%s'", cameracontroller.zoombehavior))
+	end
 end
 
 --- advances internal currentzoomdistance by zoominput

@@ -574,7 +574,7 @@ end
 --- advances rig animation constraint transforms wrt elapsed time
 function rig.stepanimationconstraints(
 	r: typeof(rig.create()),
-	locomotion: "idle" | "walk" | "fall" | "seat" | "fly",
+	state: "idle" | "walk" | "fall" | "seat" | "fly",
 	crouched: boolean,
 	toolpose: "none" | "left" | "right" | "both",
 	elapsed: number,
@@ -599,17 +599,17 @@ function rig.stepanimationconstraints(
 		return
 	end
 
-	if locomotion == "seat" then
+	if state == "seat" then
 		rightshoulder:SetAttribute(rig.maxvelocityflag, 0.15)
 		leftshoulder:SetAttribute(rig.maxvelocityflag, 0.15)
 		--- rightshoulder.DesiredAngle = math.pi/2
 		--- leftshoulder.DesiredAngle = -math.pi/2
 		--- righthip.DesiredAngle = math.pi/2
 		--- lefthip.DesiredAngle = -math.pi/2
-		rightshoulder.Transform = CFrame.Angles(0, 0, math.pi/2)
-		leftshoulder.Transform = CFrame.Angles(0, 0, -math.pi/2)
-		righthip.Transform = CFrame.Angles(0, 0, math.pi/2)
-		lefthip.Transform = CFrame.Angles(0, 0, -math.pi/2)
+		rightshoulder.Transform = CFrame.fromOrientation(0, 0, math.pi/2)
+		leftshoulder.Transform = CFrame.fromOrientation(0, 0, -math.pi/2)
+		righthip.Transform = CFrame.fromOrientation(0, 0, math.pi/2)
+		lefthip.Transform = CFrame.fromOrientation(0, 0, -math.pi/2)
 
 		return
 	end
@@ -621,37 +621,37 @@ function rig.stepanimationconstraints(
 		neck:SetAttribute(rig.maxvelocityflag, 0.5)
 		rootjoint:SetAttribute(rig.maxvelocityflag, 0.5)
 		addhipangle = math.pi/4
-		neck.Transform = CFrame.Angles(rig.solveanimationconstraintdesiredangle(neck, -math.pi/4), 0, 0)
-		rootjoint.Transform = CFrame.new(0, 0, -0.25) * CFrame.Angles(rig.solveanimationconstraintdesiredangle(rootjoint, math.pi/4), 0, 0)
+		neck.Transform = CFrame.fromOrientation(rig.solveanimationconstraintdesiredangle(neck, -math.pi/4), 0, 0)
+		rootjoint.Transform = CFrame.new(0, 0, -0.25) * CFrame.fromOrientation(rig.solveanimationconstraintdesiredangle(rootjoint, math.pi/4), 0, 0)
 	else
 		neck:SetAttribute(rig.maxvelocityflag, 0.5)
 		rootjoint:SetAttribute(rig.maxvelocityflag, 0.5)
 		addhipangle = 0
-		neck.Transform = CFrame.Angles(rig.solveanimationconstraintdesiredangle(neck, 0), 0, 0)
-		rootjoint.Transform = CFrame.Angles(rig.solveanimationconstraintdesiredangle(rootjoint, 0), 0, 0)
+		neck.Transform = CFrame.fromOrientation(rig.solveanimationconstraintdesiredangle(neck, 0), 0, 0)
+		rootjoint.Transform = CFrame.fromOrientation(rig.solveanimationconstraintdesiredangle(rootjoint, 0), 0, 0)
 	end
   
-	if (locomotion == "fall") then
+	if (state == "fall") then
 		rightshoulder:SetAttribute(rig.maxvelocityflag, 0.5)
 		leftshoulder:SetAttribute(rig.maxvelocityflag, 0.5)
 
 		if (crouched) then
 			local approxangle = 0.1 * math.sin(elapsed * 1)
-			rightshoulder.Transform = CFrame.Angles(0, 0, approxangle)
-			leftshoulder.Transform = CFrame.Angles(0, 0, approxangle)
+			rightshoulder.Transform = CFrame.fromOrientation(0, 0, approxangle)
+			leftshoulder.Transform = CFrame.fromOrientation(0, 0, approxangle)
 		else
-			rightshoulder.Transform = CFrame.Angles(0, 0, math.pi)
-			leftshoulder.Transform = CFrame.Angles(0, 0, -math.pi)
+			rightshoulder.Transform = CFrame.fromOrientation(0, 0, math.pi)
+			leftshoulder.Transform = CFrame.fromOrientation(0, 0, -math.pi)
 		end
-		righthip.Transform = CFrame.Angles(0, 0, addhipangle)
-		lefthip.Transform = CFrame.Angles(0, 0, -addhipangle)
+		righthip.Transform = CFrame.fromOrientation(0, 0, addhipangle)
+		lefthip.Transform = CFrame.fromOrientation(0, 0, -addhipangle)
 
 		return
 	end
 
 	local amplitude, frequency
 	
-	if locomotion == "idle" then
+	if state == "idle" then
 		amplitude = 0.1
 		frequency = 1
 	else
@@ -663,20 +663,20 @@ function rig.stepanimationconstraints(
 
 	local desiredangle = amplitude * math.sin(elapsed * frequency)
 
-	rightshoulder.Transform = CFrame.Angles(0, 0, desiredangle)
-	leftshoulder.Transform = CFrame.Angles(0, 0, desiredangle)
-	righthip.Transform = CFrame.Angles(0, 0, -(desiredangle - addhipangle))
-	lefthip.Transform = CFrame.Angles(0, 0, -(desiredangle + addhipangle))
+	rightshoulder.Transform = CFrame.fromOrientation(0, 0, desiredangle)
+	leftshoulder.Transform = CFrame.fromOrientation(0, 0, desiredangle)
+	righthip.Transform = CFrame.fromOrientation(0, 0, -(desiredangle - addhipangle))
+	lefthip.Transform = CFrame.fromOrientation(0, 0, -(desiredangle + addhipangle))
 
 	if toolpose == "none" then
 
 	elseif toolpose == "right" then
-		rightshoulder.Transform = CFrame.Angles(0, 0, math.pi/2)
+		rightshoulder.Transform = CFrame.fromOrientation(0, 0, math.pi/2)
 	elseif toolpose == "left" then
-		leftshoulder.Transform = CFrame.Angles(0, 0, -math.pi/2)
+		leftshoulder.Transform = CFrame.fromOrientation(0, 0, -math.pi/2)
 	elseif toolpose == "both" then
-		rightshoulder.Transform = CFrame.Angles(0, 0, math.pi/2)
-		leftshoulder.Transform = CFrame.Angles(0, 0, -math.pi/2)
+		rightshoulder.Transform = CFrame.fromOrientation(0, 0, math.pi/2)
+		leftshoulder.Transform = CFrame.fromOrientation(0, 0, -math.pi/2)
 	end
 end
 

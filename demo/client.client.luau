@@ -38,10 +38,21 @@ interpolation.breakpointset({
 })
 
 --- set base movement values
-
 ccinput.speed = 32
 ccinput.jumppower = 50
 ccinput.floatpower = 500
+
+--- manip floorcast length/radius
+--- so that character can more easily traverse
+--- slopes/wedges
+ccinput.floorcastextend = 1/8
+ccinput.radiusextend = -1/8
+
+--- set cameracontroller zoom behavior
+cameracontroller.zoombehavior = "snap"
+
+--- set camera fov
+camera.FieldOfView = 90
 
 --- userinputservice reading
 --- jump/crouch inputs, although it would make sense if handled internally,
@@ -195,7 +206,26 @@ local function step(dt: number)
 	--- if the player-character is dead or the client is in a state where
 	--- it shouldnt be allowed to apply movement inputs
 
+	--- step character by dt
 	cc.step(character, dt)
+
+	--- write values to local replication buffer after stepping character
+	local r = replication.self
+	--- write cframe
+	replication.writeposition(r, ccoutput.position)
+	replication.writerotation(r, ccoutput.rotationx, ccoutput.rotationy)
+	--- write movevector
+	--- special case exists for up/down inputs as jumping and crouching are 2 separate inputs
+	--- with their own independent behaviors
+	local movevector = inputcontroller.vector
+	replication.writeinput(
+		r,
+		replication.signedtobits(movevector.X),
+		replication.updowntobits(ccinput.inputup, ccinput.inputdown),
+		replication.signedtobits(movevector.Z)
+	)
+	--- write state
+	replication.writestate(r, ccoutput.state)
 
 	debug.profileend()
 end
@@ -203,8 +233,6 @@ end
 RunService.Heartbeat:Connect(step)
 
 --- cc replication cycle
-
-local frame = 0
 local resynccache = replication.resynccache
 
 do --- force guarantee local replication
@@ -224,9 +252,9 @@ end
 
 local function replicate(dt: number)
 	debug.profilebegin("cc_replicate")
-	frame += 1
+	interpolation.cycle += 1
 
-	local iszeroframe = frame % interpolation.maxcycle == 0
+	local resetcycle = interpolation.cycle % interpolation.maxcycle == 0
 	local i = interpolation.i(dt)
 
 	local replicationfocus = Vector3.zero
@@ -239,21 +267,22 @@ local function replicate(dt: number)
 		local player = Players:GetPlayerByUserId(userid)
 		if player then
 			local islocal = player == localplayer
-			local character = player.Character::typeof(rig.create())
-			if not character then
-				--- create empty character
-				character = cc.create()
+			if not player.Character then
+				--- create character if dne
+				local character = cc.create()
 				assert(character)
 				character.Name = player.Name
 				character.Parent = cc.container
 				player.Character = character
 
-				local sphere = character.Sphere
-				local rootpart = character.RootPart
+				local characterrootpart = character:FindFirstChild("RootPart")
+				assert(characterrootpart and characterrootpart:IsA("BasePart"))
 
 				--- localcharacter case
+				--- set camerasubject
+				--- move to spawnlocation
 				if islocal then
-					rootpart.Anchored = false
+					characterrootpart.Anchored = false
 					camera.CameraSubject = character:WaitForChild("Head")
 					camera.CameraType = Enum.CameraType.Custom
 
@@ -264,12 +293,25 @@ local function replicate(dt: number)
 					end)
 					if not s then warn(e) end
 				else
-					rootpart.Anchored = true
+					characterrootpart.Anchored = true
 				end
 
-				sphere.Transparency = 1
-				rootpart.Transparency = 1
+				--- create rig and attach
+				local newrig = rig.create()
+				newrig.Parent = character
+
+				local rigroot = newrig:FindFirstChild("RootPart")
+				assert(rigroot and rigroot:IsA("BasePart"))
+				local rootattachment = rigroot:FindFirstChild("RootAttachment")
+				assert(rootattachment and rootattachment:IsA("Attachment"))
+				
+				local rigjoint = characterrootpart:FindFirstChild("RigJoint")
+				assert(rigjoint and rigjoint:IsA("AnimationConstraint"))
+
+				rigjoint.Attachment1 = rootattachment
 			else
+				--- destroy if below fallenpartsdestroyheight
+				local character = player.Character
 				local pivot = character:GetPivot()
 				if pivot.Y <= workspace.FallenPartsDestroyHeight or character.PrimaryPart == nil or not character.PrimaryPart:IsDescendantOf(workspace) then
 					player.Character = nil
@@ -279,18 +321,19 @@ local function replicate(dt: number)
 				end
 			end
 
-			if islocal then --- if not islocal but keeping this notation for readability
+			if islocal then
+				--- early skip if islocal as local character is never pivoted
 				continue
 			else
+				--- resolve pivot for replicated character
 				local position = replication.readposition(resync)
 
 				local distancefromfocus = vector.magnitude(position::any - replicationfocus::any)
 				local breakpoint = interpolation.breakpointresolve(distancefromfocus)
 
-				if frame % breakpoint.cycle == 0 then
-
-					local rotation = replication.readrotation(resync)
-					local cframe = CFrame.new(position) * rotation
+				if interpolation.cycle % breakpoint.cycle == 0 then
+					local cframe = CFrame.new(position)
+					local character = player.Character
 
 					if breakpoint.interpolate == true then
 						local pivot = character:GetPivot()
@@ -307,18 +350,105 @@ local function replicate(dt: number)
 			end
 		else
 			--- attempt to replicate non-player character
-			--- out of scope for this test case
+			--- out of scope for demo case
 			continue
 		end
 	end
 	
-	if iszeroframe then
-		frame = 0
+	if resetcycle then
+		interpolation.cycle = 0
 	end
 
 	debug.profileend()
 end
 
 RunService.Heartbeat:Connect(replicate)
+
+--- basic animation pattern
+--- always applies strafing/rotations
+--- but limb transforms are set every framerate
+
+local framerate = 1/24
+local elapsed = 0
+local function animate(dt: number)
+	elapsed += dt
+	local animatethisframe = false
+	if elapsed > framerate then
+		elapsed = 0
+		animatethisframe = true
+	end
+
+	--- interpolation.i(dt)
+	local i = 1 - (10e-8 ^ dt)
+
+	for _, player in Players:GetPlayers() do
+		local islocal = player == localplayer
+
+		--- resolve resync buffer
+		--- if player == localplayer then override with local replication
+		local resync
+		if islocal then
+			resync = replication.self
+		else
+			local _, r = replication.findbyuserid(player.UserId)
+			if r then
+				resync = r
+			end
+		end
+		if not resync then continue end
+
+		--- soft asserts
+		local character = player.Character
+		if not character then continue end
+		local playerrig: typeof(rig.create())? = character:FindFirstChild("rig")
+		if not playerrig then continue end
+
+		--- resolve rotations
+		local rx, ry
+		if islocal then
+			rx, ry = camera.CFrame:ToOrientation()
+		else
+			rx, ry = replication.readrotation(resync)
+		end
+
+		--- resolve rotations for strafing animation
+		local ix, iy = replication.readinput(resync)
+		local xsign
+		if islocal then
+			xsign = inputcontroller.vector.X
+		else
+			xsign = replication.bitstosigned(ix)
+		end
+		xsign = math.map(xsign, -1, 1, -math.pi/4, math.pi/4)
+
+		local xvalue = character:GetAttribute("xvalue") or 0
+		local xreal = math.lerp(xvalue, xsign, i)
+		character:SetAttribute("xvalue", xreal)
+
+		--- set attachment cframes
+		for _, attachment in ipairs(character:QueryDescendants("Attachment")) do
+			assert(attachment:IsA("Attachment"))
+			if attachment.Name == "NeckAttachment1" then
+				attachment.CFrame = CFrame.new(0, -0.5, 0) * CFrame.Angles(-math.pi/2, 0, math.pi) * CFrame.Angles(rx, 0, -xreal)
+			elseif attachment.Name == "RootAttachment" then
+				attachment.CFrame = CFrame.fromOrientation(0, -ry + xreal, 0)
+			end
+		end
+
+		--- procedural animationconstraint animation wrt elapsed (os.clock())
+		if animatethisframe then
+			task.defer(
+				rig.stepanimationconstraints,
+				playerrig,
+				replication.statetostring(replication.readstate(resync))::any,
+				iy == 2 or iy == 3 or false,
+				"none"::any,
+				os.clock()
+			)
+		end
+	end
+end
+
+RunService.Heartbeat:Connect(animate)
 
 return true
