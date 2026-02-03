@@ -7,10 +7,15 @@
 --- for saving resources (expensive cframe pivot/lerps) when moving replicated characters \
 --- breakpoint cycles are intended to divide evenly into `interpolation.maxcycle` otherwise may cause inconsistencies
 local interpolation = {
+	--- base value for resolving framerate-independent interpolant `1 - (base ^ dt)`
 	base = 10e-11;
 	cycle = 0;
 	maxcycle = 60;
+	--- breakpoints set by `interpolation.breakpointset()`
 	breakpoints = {};
+
+	--- directly pivot instead of lerping if distance between replicated character and replication focus is larger than this value
+	maxdistance = math.huge;
 }
 
 --- creates an interpolation breakpoint instruction \

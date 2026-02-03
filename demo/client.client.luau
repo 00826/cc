@@ -26,16 +26,19 @@ local ccoutput = cc.output
 
 local camera = workspace.CurrentCamera
 
-local lastflystate = 0
-local lastfloor = nil
-
---- set interpolation breakpoints \
+--- set interpolation breakpoints
 --- interfacing should be a "set once and forget about it"
 interpolation.breakpointset({
 	interpolation.createbreakpoint(400, true, 1); --- if interpolation target is within 400 studs, lerp pivot every frame
 	interpolation.createbreakpoint(800, false, 2); --- if interpolation target is within 800 studs, pivot every 2 frames
 	interpolation.createbreakpoint(1200, false, 4); --- if interpolation target is within 1200 studs, pivot every 4 frames. this is also the fallback if target is beyond the range of all breakpoints
 })
+
+--- set pivot-instead-of-lerp distance;
+--- if distance between replication focus and replicated character is larger than this value
+--- it will not be lerped toward its replication target and instead directly pivoted (regardless of its interpolation breakpoint)
+--- this is to avoid lerping characters that don't need to be lerped
+interpolation.maxdistance = 1000
 
 --- set base movement values
 ccinput.speed = 32
@@ -299,16 +302,26 @@ local function spawnpoint()
 	return spawnlocations[1] and spawnlocations[1].Position or Vector3.yAxis * 100
 end
 
---- cache of player-character models
+--- cache of player-character models;
+--- because characters are instantiated on the client, (all the server does is emit buffers)
+--- player-characters aren't destroyed when a player leaves
+--- because, from the perspective of the server, characters don't exist.
+--- so handling player-character destruction has to be handled per-client
+--- caching-by-string-userid is not the prettiest way to do things
+--- but for the sake of the demo it gets the job done
+
+--- `{[string stringuserid]: typeof(cc.create())}`
 local playercharacters = {}
 
 local function replicate(dt: number)
 	debug.profilebegin("cc_replicate")
 	interpolation.cycle += 1
 
+	--- resolve framerate-independent interpolant for this replication frame
 	local resetcycle = interpolation.cycle % interpolation.maxcycle == 0
 	local i = interpolation.i(dt)
 
+	--- set replication focus
 	local replicationfocus = Vector3.zero
 	if localplayer.Character then
 		replicationfocus = localplayer.Character:GetPivot().Position
@@ -327,7 +340,12 @@ local function replicate(dt: number)
 				character.Parent = cc.container
 				player.Character = character
 
+				--- cache and connect function to uncache when destroyed
 				playercharacters[tostring(userid)] = character
+				character.Destroying:Once(function()
+					player.Character = nil
+					playercharacters[tostring(userid)] = nil
+				end)
 
 				local characterrootpart = character:FindFirstChild("RootPart")
 				assert(characterrootpart and characterrootpart:IsA("BasePart"))
@@ -351,6 +369,8 @@ local function replicate(dt: number)
 				end
 
 				--- create rig and attach
+				--- ideally this would be a developer-prescribed rig
+				--- but this is just a minimal example
 				local newrig = rig.create()
 				newrig.Parent = character
 
@@ -364,7 +384,7 @@ local function replicate(dt: number)
 
 				rigjoint.Attachment1 = rootattachment
 			else
-				--- destroy if below fallenpartsdestroyheight
+				--- destroy if below fallenpartsdestroyheight then skip
 				local character = player.Character
 				local pivot = character:GetPivot()
 				if pivot.Y <= workspace.FallenPartsDestroyHeight or character.PrimaryPart == nil or not character.PrimaryPart:IsDescendantOf(workspace) then
@@ -375,31 +395,31 @@ local function replicate(dt: number)
 				end
 			end
 
-			if islocal then
-				--- early skip if islocal as local character is never pivoted
-				continue
-			else
-				--- resolve pivot for replicated character
-				local position = replication.readposition(resync)
+			--- early skip if islocal as local character is never pivoted
+			if islocal then continue end
 
-				local distancefromfocus = vector.magnitude(position::any - replicationfocus::any)
-				local breakpoint = interpolation.breakpointresolve(distancefromfocus)
+			--- read replicated character position
+			local position = replication.readposition(resync)
 
-				if interpolation.cycle % breakpoint.cycle == 0 then
-					local cframe = CFrame.new(position)
-					local character = player.Character
+			--- resolve breakpoint
+			local distancefromfocus = vector.magnitude(position::any - replicationfocus::any)
+			local breakpoint = interpolation.breakpointresolve(distancefromfocus)
 
-					if breakpoint.interpolate == true then
-						local pivot = character:GetPivot()
-						local distancefromtarget = vector.magnitude(position::any - pivot.Position::any)
-						if distancefromtarget > 1000 then
-							character:PivotTo(cframe)
-						else
-							character:PivotTo(pivot:Lerp(cframe, i))
-						end
-					else
+			--- pivot/lerp replicated character
+			if interpolation.cycle % breakpoint.cycle == 0 then
+				local cframe = CFrame.new(position)
+				local character = player.Character
+
+				if breakpoint.interpolate == true then
+					local pivot = character:GetPivot()
+
+					if distancefromfocus > interpolation.maxdistance then
 						character:PivotTo(cframe)
+					else
+						character:PivotTo(pivot:Lerp(cframe, i))
 					end
+				else
+					character:PivotTo(cframe)
 				end
 			end
 		else
