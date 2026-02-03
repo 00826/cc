@@ -299,6 +299,9 @@ local function spawnpoint()
 	return spawnlocations[1] and spawnlocations[1].Position or Vector3.yAxis * 100
 end
 
+--- cache of player-character models
+local playercharacters = {}
+
 local function replicate(dt: number)
 	debug.profilebegin("cc_replicate")
 	interpolation.cycle += 1
@@ -316,13 +319,15 @@ local function replicate(dt: number)
 		local player = Players:GetPlayerByUserId(userid)
 		if player then
 			local islocal = player == localplayer
-			if not player.Character then
+			if not playercharacters[tostring(userid)] then
 				--- create character if dne
 				local character = cc.create()
 				assert(character)
 				character.Name = player.Name
 				character.Parent = cc.container
 				player.Character = character
+
+				playercharacters[tostring(userid)] = character
 
 				local characterrootpart = character:FindFirstChild("RootPart")
 				assert(characterrootpart and characterrootpart:IsA("BasePart"))
@@ -412,6 +417,15 @@ local function replicate(dt: number)
 end
 
 RunService.Heartbeat:Connect(replicate)
+
+Players.PlayerRemoving:Connect(function(player: Player)
+	local stringuserid = tostring(player.UserId)
+	local character = playercharacters[stringuserid]
+	if character then
+		character:Destroy()
+		playercharacters[stringuserid] = nil
+	end
+end)
 
 --- basic animation pattern
 --- always applies strafing/rotations
