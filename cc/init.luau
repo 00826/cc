@@ -95,8 +95,10 @@ local cc = {
 		floatmodifier = 1;
 
 		bodyvelocitymaxforce = Vector3.new(10000, 10000, 10000);
-		bodyvelocitymaxforcemodifier = 1;
+		bodyvelocitymaxforcemodifier = Vector3.one;
 		bodyvelocityp = 100;
+		--- written externally, similar to cameracontroller shake vectors
+		bodyvelocityimpulse = Vector3.zero;
 
 		bodygyrod = 50;
 		bodygyromaxtorque = Vector3.new(math.huge, math.huge, math.huge);
@@ -353,7 +355,7 @@ function cc.step(character: typeof(cc.create()), dt: number)
 	rootpart.AssemblyAngularVelocity = Vector3.zero
 
 	--- resolve bodyvelocity
-	local velocity = truevector * input.speed * input.speedmodifier * math.clamp(len, 0, 1)
+	local velocity = (truevector * input.speed * input.speedmodifier * math.clamp(len, 0, 1)) + input.bodyvelocityimpulse
 	if isflying then
 		bodyvelocity.MaxForce = input.bodyvelocitymaxforce * input.bodyvelocitymaxforcemodifier
 		bodyvelocity.Velocity = velocity

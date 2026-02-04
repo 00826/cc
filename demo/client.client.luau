@@ -61,6 +61,14 @@ cameracontroller.touchpanuserawinput = true
 --- set camera fov
 camera.FieldOfView = 90
 
+--- if grounded/airborne, apply associated
+--- customphysicalproperties to cc sphere (collision/physics geometry)
+--- for this case, less friction is applied while airborne
+--- to produce sliding/frictionless movement
+local airbornecustomphysicalproperties = PhysicalProperties.new(0.7, 0.04, 0.00, 100, 100)
+local groundedcustomphysicalproperties = PhysicalProperties.new(0.7, 0.20, 0.00, 100, 100)
+local groundstate = false
+
 --- userinputservice reading
 --- jump/crouch inputs, although it would make sense if handled internally,
 --- is handled externally for easy developer-prescribed behaviors such as
@@ -157,7 +165,6 @@ local function updatelimbtransparency(visible: boolean)
 end
 
 --- cc step
-
 local function step(dt: number)
 	debug.profilebegin("cc_step")
 
@@ -170,24 +177,40 @@ local function step(dt: number)
 
 	--- interpolate camera shake vectors toward zero using some arbitrary interpolant
 	local i = 1 - (10e-5 ^ dt)
-	vector.lerp(cameracontroller.camerashakeoffset::any, Vector3.zero::any, i)
-	vector.lerp(cameracontroller.camerashakerotation::any, Vector3.zero::any, i)
+	cameracontroller.camerashakeoffset = vector.lerp(cameracontroller.camerashakeoffset::any, Vector3.zero::any, i)::any
+	cameracontroller.camerashakerotation = vector.lerp(cameracontroller.camerashakerotation::any, Vector3.zero::any, i)::any
 
-	--- if flying, scale speed by 2
-	--- otherwise scale speed by 0.5 if crouched or 1 if nothing else
-	if ccinput.flying == true then
-		ccinput.speedmodifier = 2
-	else
-		if ccinput.inputdown == 1 then
-			ccinput.speedmodifier = 0.5
-		else
-			ccinput.speedmodifier = 1
-		end
-	end
+	--- interpolate bodyvelocityimpulse toward zero using some arbitrary interpolant
+	--- for this demo, bodyvelocityimpulse is used to produce artificial momentum
+	local j = 1 - (10e-7 ^ dt)
+	ccinput.bodyvelocityimpulse = vector.lerp(ccinput.bodyvelocityimpulse::any, Vector3.zero::any, j)::any
 
 	--- early return if character doesn't exist
 	local character = localplayer.Character
 	if not character then return end
+	
+	if ccinput.flying == true then
+		--- if flying, scale speed by 2
+		ccinput.speedmodifier = 2
+	else
+		if ccinput.inputdown == 1 then
+			--- if crouched, scale speed by 0.5
+			ccinput.speedmodifier = 0.5
+
+			--- if zero input vector or airborne, zero-out xz components of body velocity
+			--- otherwise keep normal
+			if inputcontroller.vector == Vector3.zero or ccoutput.floor == nil then
+				ccinput.bodyvelocitymaxforcemodifier = Vector3.yAxis
+			else
+				ccinput.bodyvelocitymaxforcemodifier = Vector3.one
+			end
+		else
+			--- if not crouched, scale speed by 1
+			ccinput.speedmodifier = 1
+
+			ccinput.bodyvelocitymaxforcemodifier = Vector3.one
+		end
+	end
 
 	--- commented-out for flying input
 	--- if character is below y -2, enter "flying" state
@@ -278,9 +301,37 @@ local function step(dt: number)
 	--- write state
 	replication.writestate(r, ccoutput.state)
 
+	local grounded = ccoutput.floor ~= nil
 	--- if flying and floor is not nil, set flying to false
-	if ccinput.flying == true and ccoutput.floor ~= nil then
+	if ccinput.flying == true and grounded == true then
 		ccinput.flying = false
+	end
+
+	--- apply momentum if any movement input is being held
+	--- otherwise immediately set impulse to zero
+	--- this is so the player-character doesn't slide around
+	--- should movement inputs be fully-ceased
+	if (ccoutput.truevector ~= Vector3.zero)
+	or (ccinput.inputup == 1)
+	or (ccinput.inputdown == 1)
+	then
+		ccinput.bodyvelocityimpulse += ccoutput.truevector
+	else
+		ccinput.bodyvelocityimpulse = Vector3.zero
+	end
+
+	--- apply customphysicalproperties
+	if groundstate ~= grounded then
+		groundstate = grounded
+
+		local sphere = character:FindFirstChild("Sphere")
+		if sphere and sphere:IsA("BasePart") then
+			if groundstate == true then
+				sphere.CustomPhysicalProperties = groundedcustomphysicalproperties
+			else
+				sphere.CustomPhysicalProperties = airbornecustomphysicalproperties
+			end
+		end
 	end
 
 	debug.profileend()
