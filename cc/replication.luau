@@ -8,7 +8,6 @@ local IsServer = RunService:IsServer()
 local Remote = script.Parent:WaitForChild("Remote")
 
 --- writes signed 24-bit integer to buffer
---@native
 local function writei24(b: buffer, offset: number, value: number)
 	local bitoffset = offset * 8
 	local sign = math.sign(value) < 0 and 1 or 0
@@ -21,7 +20,6 @@ local function writei24(b: buffer, offset: number, value: number)
 end
 
 --- reads signed 24-bit integer from buffer
---@native
 local function readi24(b: buffer, offset: number)
 	local bitoffset = offset * 8
 	local value = buffer.readbits(b, bitoffset, 23)

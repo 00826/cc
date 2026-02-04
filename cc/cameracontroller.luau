@@ -12,7 +12,7 @@ local UserInputService = game:GetService("UserInputService")
 local viewport = require(script.Parent.viewport)
 
 --- creates a spring
--- @native
+@native
 function createspring(frequency: number, distance: number, mindistance: number, maxdistance: number)
 	distance = math.clamp(distance, mindistance, maxdistance)
 	return {
@@ -29,7 +29,7 @@ function createspring(frequency: number, distance: number, mindistance: number, 
 end
 
 --- advances spring by `dt`
--- @native
+@native
 function springstep(s: typeof(createspring(...)), dt: number)
 	local freq = s.frequency * 2 * math.pi --- Convert from Hz to rad/s
 	local distance = s.distance
@@ -178,11 +178,11 @@ local cameracontroller = {
 	arrowkeyspeed = math.rad(120);
 	--- gamepad pan speed in radians/sec \
 	--- ROTATION_SPEED_GAMEPAD
-	gamepadspeed = Vector2.new(1, 0.77) * math.rad(7);
+	gamepadspeed = Vector2.new(1, 1) * math.rad(7); --- Vector2.new(1, 0.77) * math.rad(7);
 
 	--- mouse pan speed in radians/sec
 	--- ROTATION_SPEED_MOUSE
-	mousespeed = Vector2.new(1, 0.77)*math.rad(0.5);
+	mousespeed = Vector2.new(1, 1)*math.rad(0.5); --- Vector2.new(1, 0.77)*math.rad(0.5);
 	--- pointer pan speed in radians/sec
 	--- ROTATION_SPEED_POINTERACTION
 	pointerspeed = Vector2.new(1, 0.77)*math.rad(7);

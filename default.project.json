@@ -19,6 +19,14 @@
 			"$ignoreUnknownInstances": true,
 			
 			"server": {"$path": "demo/server.server.luau"}
+		},
+		"StarterPlayer": {
+			"$className": "StarterPlayer",
+			"StarterPlayerScripts": {
+				"$className": "StarterPlayerScripts",
+				"PlayerModule": { "$className": "ModuleScript" },
+				"PlayerScriptsLoader": { "$className": "LocalScript" }
+			}
 		}
 	}
 }

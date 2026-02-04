@@ -4,7 +4,7 @@ local RunService = game:GetService("RunService")
 local IsServer = RunService:IsServer()
 
 --- returns unit vector from input vector `i`, relative to viewport `lookvector, -upvector`
---- @native
+@native
 local function movevector(i: Vector3, lookvector: Vector3, upvector: Vector3)
 	local rightvector = (vector.cross(lookvector::any, upvector::any)::any)::Vector3
 	local cos, sin
@@ -28,7 +28,7 @@ local function movevector(i: Vector3, lookvector: Vector3, upvector: Vector3)
 end
 
 --- returns xyz movevector from input vector `i` and vertical input `v` relative to `cframe`
---- @native
+@native
 function movevectorxyz(i: Vector3, v: number, cframe: CFrame)
 	local vec = cframe.Rotation:VectorToWorldSpace(i) + (Vector3.yAxis * v)
 	if vec == Vector3.zero then
