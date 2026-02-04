@@ -54,6 +54,10 @@ ccinput.radiusextend = -1/8
 --- set cameracontroller zoom behavior
 cameracontroller.zoombehavior = "snap"
 
+--- set cameracontroller touch device pan use raw (non-curved) input
+--- for responsiveness
+cameracontroller.touchpanuserawinput = true
+
 --- set camera fov
 camera.FieldOfView = 90
 

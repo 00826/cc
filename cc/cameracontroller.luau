@@ -178,17 +178,18 @@ local cameracontroller = {
 	arrowkeyspeed = math.rad(120);
 	--- gamepad pan speed in radians/sec \
 	--- ROTATION_SPEED_GAMEPAD
-	gamepadspeed = Vector2.new(1, 1) * math.rad(7); --- Vector2.new(1, 0.77) * math.rad(7);
-
+	gamepadspeed = math.rad(7); --- Vector2.new(1, 0.77) * math.rad(7);
 	--- mouse pan speed in radians/sec
 	--- ROTATION_SPEED_MOUSE
-	mousespeed = Vector2.new(1, 1)*math.rad(0.5); --- Vector2.new(1, 0.77)*math.rad(0.5);
+	mousespeed = math.rad(0.5); --- Vector2.new(1, 0.77)*math.rad(0.5);
 	--- pointer pan speed in radians/sec
 	--- ROTATION_SPEED_POINTERACTION
-	pointerspeed = Vector2.new(1, 0.77)*math.rad(7);
+	pointerspeed = math.rad(7); --- Vector2.new(1, 0.77)*math.rad(7);
 	--- touch pan speed in radians/sec
 	--- ROTATION_SPEED_TOUCH
-	touchspeed = Vector2.new(1, 0.66)*math.rad(1);
+	touchspeed = math.rad(1); --- Vector2.new(1, 0.66)*math.rad(1);
+	--- will touch pan input be modified (curved) by cameracontroller.resolvetouchpitchsensitivity()
+	touchpanuserawinput = false;
 
 	--- (scaled studs/wheel click)
 	--- ZOOM_SPEED_MOUSE
@@ -481,10 +482,10 @@ function cameracontroller.stepzoom(zoominput: number)
 end
 
 --- returns lookvector rotated by input rotation
-function cameracontroller.rotatelookvector(lookvector: Vector3, rotation: Vector2)
+function cameracontroller.rotatelookvector(lookvector: Vector3, rotation: Vector3)
 	local pitchangle = math.asin(lookvector.Y)
 	local ry = math.clamp(rotation.Y, -cameracontroller.cameramaxpitch + pitchangle, -cameracontroller.cameraminpitch + pitchangle)
-	local constrainedrotateinput = Vector2.new(rotation.X, ry)
+	local constrainedrotateinput = Vector3.new(rotation.X, ry, 0)
 	local cframe = CFrame.Angles(0, -constrainedrotateinput.X, 0) * CFrame.lookAlong(Vector3.zero, lookvector) * CFrame.Angles(-constrainedrotateinput.Y, 0, 0)
 
 	return cframe.LookVector
@@ -509,7 +510,7 @@ end
 
 --- "...adjusts the touch sensitivity delta so that sensitivity is reduced when swiping up \
 --- or down, but stays the same when swiping towards the middle of the screen"
-function cameracontroller.resolvetouchpitchsensitivity(delta: Vector2): Vector2
+function cameracontroller.resolvetouchpitchsensitivity(delta: Vector3)
 	local camera = cameracontroller.camera
 
 	if not camera then
@@ -532,7 +533,7 @@ function cameracontroller.resolvetouchpitchsensitivity(delta: Vector2): Vector2
 	--- remap curveY from [0, 1] -> [MIN_TOUCH_SENSITIVITY_FRACTION, 1]
 	local sensitivity = math.map(curveY, 0, 1, cameracontroller.touhchsensitivityfraction, 1)
 
-	return Vector2.new(1, sensitivity)*delta
+	return Vector3.new(1 * delta.X, sensitivity * delta.Y, 0)
 end
 
 function cameracontroller.mapsignedvaluetodeadzone(value: number, deadzone: number)
@@ -557,16 +558,21 @@ function cameracontroller.getrotationinput(dt: number, disablekeyboardrotation: 
 	local gamepadx = cameracontroller.mapsignedvaluetodeadzone(paninputs[1], gamepaddeadzone)
 	local gamepady = cameracontroller.mapsignedvaluetodeadzone(paninputs[2], gamepaddeadzone)
 
-	local gamepadrotationvector = cameracontroller.gamepadspeed * Vector2.new(gamepadx, gamepady) * UserGameSettings.GamepadCameraSensitivity
-	local keyboardrotationvector = cameracontroller.arrowkeyspeed * Vector2.new(paninputs[3] + paninputs[4], 0) * dt
-	local mousemovevector = cameracontroller.mousespeed * Vector2.new(paninputs[5], paninputs[6])
-	local pointerpanvector = cameracontroller.pointerspeed * Vector2.new(paninputs[7], paninputs[8])
-	local touchpanvector = cameracontroller.touchspeed * cameracontroller.resolvetouchpitchsensitivity(Vector2.new(paninputs[9], paninputs[10]))
+	local gamepadrotationvector = cameracontroller.gamepadspeed * Vector3.new(gamepadx, gamepady, 0) * UserGameSettings.MouseSensitivity
+	local keyboardrotationvector = cameracontroller.arrowkeyspeed * Vector3.new(paninputs[3] + paninputs[4], 0, 0) * dt
+	local mousemovevector = cameracontroller.mousespeed * Vector3.new(paninputs[5], paninputs[6], 0)
+	local pointerpanvector = cameracontroller.pointerspeed * Vector3.new(paninputs[7], paninputs[8], 0)
+	local touchpanvector = Vector3.zero
+	if cameracontroller.touchpanuserawinput == true then
+		touchpanvector = cameracontroller.touchspeed * Vector3.new(paninputs[9], paninputs[10], 0)
+	else
+		touchpanvector = cameracontroller.touchspeed * cameracontroller.resolvetouchpitchsensitivity(Vector3.new(paninputs[9], paninputs[10], 0))
+	end
 
-	local camerayinvertvector = Vector2.new(1, UserGameSettings:GetCameraYInvertValue())
+	local camerayinvertvector = Vector3.new(1, UserGameSettings:GetCameraYInvertValue(), 0)
 
 	if disablekeyboardrotation then
-		keyboardrotationvector *= Vector2.zero
+		keyboardrotationvector *= Vector3.zero
 	end
 
 	return (
