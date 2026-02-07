@@ -1,276 +1,28 @@
 --!strict
 
+--- export type limb = {
+--- 	meshid: string;
+--- 	scale: Vector3;
+--- 	hasface: boolean;
+--- 
+--- 	humanoiddescriptionclothingproperties: { string };
+--- 	humanoiddescriptioncolorproperty: string;
+--- 
+--- 	size: Vector3;
+--- 	transparency: number;
+--- 
+--- 	attachments: { [string]: CFrame };
+--- 	animationconstraints: { [string]: { attachment0: string, attachment1: string, iskinematic: boolean } };
+--- 	ballsocketconstraints: { [string]: { attachment0: string, attachment1: string } };
+--- 
+--- 	ragdollcollision: boolean;
+--- }
+
 --- ### rig.luau
 --- 
 --- minimal r6+2(hands) rig \
 --- visual geometry, uv texturing, and hat placement is consistent with a humanoid r6 rig
 local rig = {
-	limbs = {
-		--- root
-		RootPart = {
-			humanoiddescriptionclothingproperties = {  };
-			humanoiddescriptioncolorproperty = "";
-
-			size = Vector3.new(2, 2, 1);
-			transparency = 1;
-
-			attachments = {
-				RootAttachment = CFrame.new(0, 0, 0);
-
-				RootJointAttachment0 = CFrame.new() * CFrame.fromOrientation(-math.pi/2, -math.pi, 0);
-			};
-			animationconstraints = {
-				RootJoint = { attachment0 = "RootJointAttachment0"; attachment1 = "RootJointAttachment1"; iskinematic = true; };
-			};
-			ballsocketconstraints = {
-				
-			};
-			--[[motors = {
-				RootJoint = { ragdolls = false; part1 = "Torso"; c0 = CFrame.new() * CFrame.fromOrientation(-math.pi/2, -math.pi, 0); c1 = CFrame.new() * CFrame.fromOrientation(-math.pi/2, -math.pi, 0); };
-			};]]
-			ragdollcollision = false;
-		};
-
-		--- head
-		Head = {
-			meshid = "rbxassetid://15606744638";
-			scale = Vector3.new(0.999, 0.999, 0.999);
-			HasFace = true;
-
-			humanoiddescriptionclothingproperties = {  };
-			humanoiddescriptioncolorproperty = "HeadColor";
-
-			size = Vector3.new(1, 1, 1);
-			transparency = 0;
-
-			attachments = {
-				FaceCenterAttachment = CFrame.new(0, 0, 0);
-				FaceFrontAttachment = CFrame.new(0, 0, -0.65);
-				HairAttachment = CFrame.new(0, 0.6, 0);
-				HatAttachment = CFrame.new(0, 0.6, 0);
-
-				NeckAttachment1 = CFrame.new(0, -0.5, 0) * CFrame.fromOrientation(-math.pi/2, -math.pi, 0);
-			};
-			animationconstraints = {
-				
-			};
-			ballsocketconstraints = {
-				
-			};
-			--[[motors = {
-
-			};]]
-			ragdollcollision = true;
-		};
-		--- torso
-		Torso = {
-			meshid = "rbxassetid://17580060252";
-			scale = Vector3.new(1, 1, 1);
-
-			humanoiddescriptionclothingproperties = { "Shirt"; "Pants"; };
-			humanoiddescriptioncolorproperty = "TorsoColor";
-
-			size = Vector3.new(2, 2, 1);
-			transparency = 0;
-
-			attachments = {
-				BodyBackAttachment = CFrame.new(0, 0, 0.5);
-				BodyFrontAttachment = CFrame.new(0, 0, -0.5);
-				LeftCollarAttachment = CFrame.new(-1, 1, 0);
-				NeckAttachment = CFrame.new(0, 1, 0);
-				RightCollarAttachment = CFrame.new(1, 1, 0);
-				WaistBackAttachment = CFrame.new(0, -1, 0.5);
-				WaistCenterAttachment = CFrame.new(0, -1, 0);
-				WaistFrontAttachment = CFrame.new(0, -1, -0.5);
-
-				RootJointAttachment1 = CFrame.new(0, 0, 0) * CFrame.fromOrientation(-math.pi/2, -math.pi, 0);
-
-				LeftHipAttachment0 = CFrame.new(-1, -1, 0) * CFrame.fromOrientation(0, -math.pi/2, 0);
-				LeftShoulderAttachment0 = CFrame.new(-1, 0.5, 0) * CFrame.fromOrientation(0, -math.pi/2, 0);
-				NeckAttachment0 = CFrame.new(0, 1, 0) * CFrame.fromOrientation(-math.pi/2, -math.pi, 0);
-				RightHipAttachment0 = CFrame.new(1, -1, 0) * CFrame.fromOrientation(0, math.pi/2, 0);
-				RightShoulderAttachment0 = CFrame.new(1, 0.5, 0) * CFrame.fromOrientation(0, math.pi/2, 0);
-			};
-			animationconstraints = {
-				LeftHip = { attachment0 = "LeftHipAttachment0"; attachment1 = "LeftHipAttachment1"; iskinematic = true; };
-				LeftShoulder = { attachment0 = "LeftShoulderAttachment0"; attachment1 = "LeftShoulderAttachment1"; iskinematic = true; };
-				Neck = { attachment0 = "NeckAttachment0"; attachment1 = "NeckAttachment1"; iskinematic = true; };
-				RightHip = { attachment0 = "RightHipAttachment0"; attachment1 = "RightHipAttachment1"; iskinematic = true; };
-				RightShoulder = { attachment0 = "RightShoulderAttachment0"; attachment1 = "RightShoulderAttachment1"; iskinematic = true; };
-			};
-			ballsocketconstraints = {
-				LeftHip = { attachment0 = "LeftHipAttachment0"; attachment1 = "LeftHipAttachment1"; };
-				LeftShoulder = { attachment0 = "LeftShoulderAttachment0"; attachment1 = "LeftShoulderAttachment1"; };
-				Neck = { attachment0 = "NeckAttachment0"; attachment1 = "NeckAttachment1"; };
-				RightHip = { attachment0 = "RightHipAttachment0"; attachment1 = "RightHipAttachment1"; };
-				RightShoulder = { attachment0 = "RightShoulderAttachment0"; attachment1 = "RightShoulderAttachment1"; };
-			};
-			--[[motors = {
-				LeftHip = { ragdolls = true; part1 = "LeftLeg"; c0 = CFrame.new(-1, -1, 0) * CFrame.fromOrientation(0, -math.pi/2, 0); c1 = CFrame.new(-0.5, 1, 0) * CFrame.fromOrientation(0, -math.pi/2, 0); };
-				LeftShoulder = { ragdolls = true; part1 = "LeftArm"; c0 = CFrame.new(-1, 0.5, 0) * CFrame.fromOrientation(0, -math.pi/2, 0); c1 = CFrame.new(0.5, 0.5, 0) * CFrame.fromOrientation(0, -math.pi/2, 0); };
-				Neck = { ragdolls = true; part1 = "Head"; c0 = CFrame.new(0, 1, 0) * CFrame.fromOrientation(-math.pi/2, -math.pi, 0); c1 = CFrame.new(0, -0.5, 0) * CFrame.fromOrientation(-math.pi/2, -math.pi, 0); };
-				RightHip = { ragdolls = true; part1 = "RightLeg"; c0 = CFrame.new(1, -1, 0) * CFrame.fromOrientation(0, math.pi/2, 0); c1 = CFrame.new(0.5, 1, 0) * CFrame.fromOrientation(0, math.pi/2, 0); };
-				RightShoulder = { ragdolls = true; part1 = "RightArm"; c0 = CFrame.new(1, 0.5, 0) * CFrame.fromOrientation(0, math.pi/2, 0); c1 = CFrame.new(-0.5, 0.5, 0) * CFrame.fromOrientation(0, math.pi/2, 0); };
-			};]]
-			ragdollcollision = true;
-		};
-		--- left
-		LeftArm = {
-			meshid = "rbxassetid://17580119910";
-			scale = Vector3.new(1, 1, 1);
-
-			humanoiddescriptionclothingproperties = { "Shirt" };
-			humanoiddescriptioncolorproperty = "LeftArmColor";
-
-			size = Vector3.new(1, 2, 1);
-			transparency = 0;
-
-			attachments = {
-				LeftGripAttachment = CFrame.new(0, -1, 0);
-				LeftShoulderAttachment = CFrame.new(0, 1, 0);
-
-				LeftShoulderAttachment1 = CFrame.new(0.5, 0.5, 0) * CFrame.fromOrientation(0, -math.pi/2, 0);
-
-				LeftWristAttachment0 = CFrame.new(0, -1, 0) * CFrame.fromOrientation(-math.pi/2, 0, 0);
-			};
-			animationconstraints = {
-				LeftWrist = { attachment0 = "LeftWristAttachment0"; attachment1 = "LeftWristAttachment1"; iskinematic = true; };
-			};
-			ballsocketconstraints = {
-				
-			};
-			--[[motors = {
-				LeftWrist = { ragdolls = false; part1 = "LeftHand"; c0 = CFrame.new(0, -1, 0) * CFrame.fromOrientation(-math.pi/2, 0, 0); c1 = CFrame.new() * CFrame.fromOrientation(0, 0, 0); };
-			};]]
-			ragdollcollision = true;
-		};
-		LeftHand = {
-			meshid = "";
-			scale = Vector3.new(1, 1, 1);
-
-			humanoiddescriptionclothingproperties = {  };
-			humanoiddescriptioncolorproperty = "";
-
-			size = Vector3.new(1, 1, 1);
-			transparency = 1;
-
-			attachments = {
-				LeftHandAttachment = CFrame.new(0, 0, 0);
-
-				LeftWristAttachment1 = CFrame.new(0, 0, 0) * CFrame.fromOrientation(0, 0, 0);
-			};
-			animationconstraints = {
-				
-			};
-			ballsocketconstraints = {
-				
-			};
-			ragdollcollision = false;
-		};
-		LeftLeg = {
-			meshid = "rbxassetid://17580119910";
-			scale = Vector3.new(1, 1, 1);
-
-			humanoiddescriptionclothingproperties = { "Pants" };
-			humanoiddescriptioncolorproperty = "LeftLegColor";
-
-			size = Vector3.new(1, 2, 1);
-			transparency = 0;
-
-			attachments = {
-				LeftFootAttachment = CFrame.new(0, -1, 0);
-
-				LeftHipAttachment1 = CFrame.new(-0.5, 1, 0) * CFrame.fromOrientation(0, -math.pi/2, 0);
-			};
-			animationconstraints = {
-				
-			};
-			ballsocketconstraints = {
-				
-			};
-			ragdollcollision = true;
-		};
-		--- right
-		RightArm = {
-			meshid = "rbxassetid://17580118235";
-			scale = Vector3.new(1, 1, 1);
-
-			humanoiddescriptionclothingproperties = { "Shirt" };
-			humanoiddescriptioncolorproperty = "RightArmColor";
-
-			size = Vector3.new(1, 2, 1);
-			transparency = 0;
-
-			attachments = {
-				RightGripAttachment = CFrame.new(0, -1, 0);
-				RightShoulderAttachment = CFrame.new(0, 1, 0);
-
-				RightShoulderAttachment1 = CFrame.new(-0.5, 0.5, 0) * CFrame.fromOrientation(0, math.pi/2, 0);
-
-				RightWristAttachment0 = CFrame.new(0, -1, 0) * CFrame.fromOrientation(-math.pi/2, 0, 0);
-			};
-			animationconstraints = {
-				RightWrist = { attachment0 = "RightWristAttachment0"; attachment1 = "RightWristAttachment1"; iskinematic = true; };
-			};
-			ballsocketconstraints = {
-				
-			};
-			motors = {
-
-			};
-			--[[motors = {
-				RightWrist = { ragdolls = false; part1 = "RightHand"; c0 = CFrame.new(0, -1, 0) * CFrame.fromOrientation(-math.pi/2, 0, 0); c1 = CFrame.new() * CFrame.fromOrientation(0, 0, 0); };
-			};]]
-			ragdollcollision = true;
-		};
-		RightHand = {
-			meshid = "";
-			scale = Vector3.new(1, 1, 1);
-
-			humanoiddescriptionclothingproperties = {  };
-			humanoiddescriptioncolorproperty = "";
-
-			size = Vector3.new(1, 1, 1);
-			transparency = 1;
-
-			attachments = {
-				RightHandAttachment = CFrame.new(0, 0, 0);
-
-				RightWristAttachment1 = CFrame.new(0, 0, 0) * CFrame.fromOrientation(0, 0, 0);
-			};
-			animationconstraints = {
-				
-			};
-			ballsocketconstraints = {
-				
-			};
-			ragdollcollision = false;
-		};
-		RightLeg = {
-			meshid = "rbxassetid://17580118235";
-			scale = Vector3.new(1, 1, 1);
-
-			humanoiddescriptionclothingproperties = { "Pants" };
-			humanoiddescriptioncolorproperty = "RightLegColor";
-
-			size = Vector3.new(1, 2, 1);
-			transparency = 0;
-
-			attachments = {
-				RightFootAttachment = CFrame.new(0, -1, 0);
-
-				RightHipAttachment1 = CFrame.new(0.5, 1, 0) * CFrame.fromOrientation(0, math.pi/2, 0);
-			};
-			animationconstraints = {
-				
-			};
-			ballsocketconstraints = {
-				
-			};
-			ragdollcollision = true;
-		};
-	};
-	
 	ballsocketconstraintproperties = {
 		LimitsEnabled = true;
 		TwistLimitsEnabled = true;
@@ -300,22 +52,29 @@ local rig = {
 	girltorso = "rbxassetid://70841440477204";
 }
 
---- returns a character rig
---- ```lua
---- r: typeof(rig.create())
---- ├ RootPart: BasePart
---- ├ Head: BasePart
---- ├ Torso: BasePart
---- ├ LeftArm: BasePart
---- ├ LeftHand: BasePart
---- ├ LeftLeg: BasePart
---- ├ RightArm: BasePart
---- ├ RightHand: BasePart
---- ├ RightLeg: BasePart
---- └ AnimationController: AnimationController
---- 	└ Animator: Animator
---- ```
-function rig.create(lt: typeof(rig.limbs)?)
+--- creates a typed limbdescription
+function rig.createlimbdescription()
+	return {
+		meshid = "";
+		scale = Vector3.one;
+		hasface = false;
+
+		humanoiddescriptionclothingproperties = {} :: {string};
+		humanoiddescriptioncolorproperty = "";
+
+		size = Vector3.one;
+		transparency = 0;
+
+		attachments = {} :: { [string]: CFrame };
+		animationconstraints = {} :: { [string]: { attachment0: string, attachment1: string, iskinematic: boolean } };
+		ballsocketconstraints = {} :: { [string]: { attachment0: string, attachment1: string } };
+
+		ragdollcollision = false;
+	}
+end
+
+--- creates a character rig
+function rig.create(limbmap: {[string]: typeof(rig.createlimbdescription())})
 	local r = Instance.new("Model")
 	r.Name = "rig"
 
@@ -331,7 +90,7 @@ function rig.create(lt: typeof(rig.limbs)?)
 	local animationconstraints = {}
 	local ballsocketconstraints = {}
 
-	for name, entry in (lt or rig.limbs)::any do
+	for name, entry in limbmap do
 		local limb = Instance.new("Part")
 		limb.Name = name
 
@@ -374,7 +133,7 @@ function rig.create(lt: typeof(rig.limbs)?)
 		end
 
 		--- limb mesh
-		if entry.meshid ~= nil then
+		if entry.meshid ~= nil and entry.meshid ~= "" then
 			local specialmesh = Instance.new("SpecialMesh")
 			specialmesh.Name = "LimbMesh"
 			specialmesh.Parent = limb
@@ -392,7 +151,7 @@ function rig.create(lt: typeof(rig.limbs)?)
 			decal.Parent = limb
 			decal.ZIndex = #entry.humanoiddescriptionclothingproperties - i
 		end
-		if entry.HasFace == true then
+		if entry.hasface == true then
 			local decal = Instance.new("Decal")
 			decal.Name = "face"
 			decal.Face = Enum.NormalId.Front
@@ -405,9 +164,9 @@ function rig.create(lt: typeof(rig.limbs)?)
 	end
 
 	--- resolve animationconstraints and ballsocketconstraints
-	for name, entry: any in rig.limbs do
+	for name, entry in limbmap do
 		local limb = limbs[name]
-		for acname, properties in entry.animationconstraints do
+		for acname, properties in pairs(entry.animationconstraints) do
 			local animationconstraint = Instance.new("AnimationConstraint")
 			animationconstraint.Name = acname
 			animationconstraint.Parent = limb
@@ -417,7 +176,7 @@ function rig.create(lt: typeof(rig.limbs)?)
 
 			animationconstraints[acname] = animationconstraint
 		end
-		for bscname, properties in entry.ballsocketconstraints do
+		for bscname, properties in pairs(entry.ballsocketconstraints) do
 			local ballsocketconstraint = Instance.new("BallSocketConstraint")
 			ballsocketconstraint.Name = bscname
 			ballsocketconstraint.Enabled = false
@@ -425,7 +184,7 @@ function rig.create(lt: typeof(rig.limbs)?)
 			ballsocketconstraint.Attachment0 = attachments[properties.attachment0]
 			ballsocketconstraint.Attachment1 = attachments[properties.attachment1]
 
-			for k, v in rig.ballsocketconstraintproperties do
+			for k, v in pairs(rig.ballsocketconstraintproperties) do
 				(ballsocketconstraint::any)[k] = v
 			end
 
@@ -440,8 +199,8 @@ function rig.create(lt: typeof(rig.limbs)?)
 end
 
 --- applies bodycolors to rig
-function rig.applybodycolors(r: typeof(rig.create()), bodycolors: { [string]: Color3 } & { [string]: any })
-	for name, entry in rig.limbs::any do
+function rig.applybodycolors(r: typeof(rig.create(...)), limbmap: {[string]: typeof(rig.createlimbdescription())}, bodycolors: { [string]: any })
+	for name, entry in limbmap do
 		local limbcolorproperty = entry.humanoiddescriptioncolorproperty
 		if not limbcolorproperty then continue end
 		if limbcolorproperty == "" then continue end
@@ -460,8 +219,8 @@ function rig.applybodycolors(r: typeof(rig.create()), bodycolors: { [string]: Co
 end
 
 --- applies clothing textures to rig
-function rig.applyclothing(r: typeof(rig.create()), clothing: { Shirt: string?; Pants: string?; ShirtColor: Color3?; PantsColor: Color3?; } & { [string]: any })
-	for name, entry in rig.limbs::any do
+function rig.applyclothing(r: typeof(rig.create(...)), limbmap: {[string]: typeof(rig.createlimbdescription())}, clothing: { Shirt: string?; Pants: string?; ShirtColor: Color3?; PantsColor: Color3?; } & { [string]: any })
+	for name, entry in limbmap do
 		local clothingproperties = entry.humanoiddescriptionclothingproperties
 		for _, property in clothingproperties do
 			local targetassetid = clothing[property]
@@ -490,7 +249,7 @@ function rig.applyclothing(r: typeof(rig.create()), clothing: { Shirt: string?; 
 end
 
 --- applies meshid to rig limb
-function rig.applybodypartappearance(r: typeof(rig.create()), bodypart: string, meshid: string?, color: Color3?, clothingtexture: string?)
+function rig.applybodypartappearance(r: typeof(rig.create(...)), limbmap: {[string]: typeof(rig.createlimbdescription())}, bodypart: string, meshid: string?, color: Color3?, clothingtexture: string?)
 	local limb = r:FindFirstChild(bodypart)
 	if limb and limb:IsA("BasePart") then
 		if meshid then
@@ -514,8 +273,8 @@ end
 --- toggles enabled property of constraints in rig and sets limb cancollide \
 --- `"animationconstraint"` for non-ragdoll \
 --- `"ballsocketconstraint"` for radgoll
-function rig.setactiveconstraints(r: typeof(rig.create()), activeconstraint: "animationconstraint"|"ballsocketconstraint", blacklist: {string}?)
-	for name: any, entry: any in rig.limbs do
+function rig.setactiveconstraints(r: typeof(rig.create(...)), limbmap: {[string]: typeof(rig.createlimbdescription())}, activeconstraint: "animationconstraint"|"ballsocketconstraint", blacklist: {string}?)
+	for name, entry in limbmap do
 		local limb = r:FindFirstChild(name)
 		--- cancollide
 		if limb and limb:IsA("BasePart") and entry.ragdollcollision == true then
@@ -564,7 +323,7 @@ end
 
 --- resets motor transforms \
 --- call before playing a non-procedural animation
-function rig.resetanimationconstrainttransforms(r: typeof(rig.create()))
+function rig.resetanimationconstrainttransforms(r: typeof(rig.create(...)))
 	for _, animationconstraint in r:QueryDescendants("AnimationConstraint") do
 		assert(animationconstraint:IsA("AnimationConstraint"))
 		animationconstraint.Transform = CFrame.identity
@@ -573,7 +332,7 @@ end
 
 --- advances rig animation constraint transforms wrt elapsed time
 function rig.stepanimationconstraints(
-	r: typeof(rig.create()),
+	r: typeof(rig.create(...)),
 	state: "idle" | "walk" | "fall" | "seat" | "fly",
 	crouched: boolean,
 	toolpose: "none" | "left" | "right" | "both",

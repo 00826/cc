@@ -118,9 +118,9 @@ function transformextrapolatorstep(t: typeof(createtransformextrapolator()), dt:
 end
 
 --- resets transform extrapolator
-function transformextrapolatorreset(t: typeof(createtransformextrapolator()))
-	t.lastcframe = nil
-end
+--- function transformextrapolatorreset(t: typeof(createtransformextrapolator()))
+--- 	t.lastcframe = nil
+--- end
 
 --- ### cameracontroller.luau
 ---
@@ -664,7 +664,7 @@ if RunService:IsClient() then
 			paninputs[4] = value
 		end
 
-		return
+		return nil
 	end
 
 	--- interally-called by userinputservice.pointeraction

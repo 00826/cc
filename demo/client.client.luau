@@ -1,17 +1,18 @@
 --!strict
 
---- ### ccclient.client.luau
+--- ### ccclient.luau
 ---
---- cc demo client script \
---- includes play by play commentary hopefully for clarity
+--- cc client script
 
 local Players = game:GetService("Players")
 local localplayer = Players.LocalPlayer
-local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
 
-local cc = require(ReplicatedStorage:WaitForChild("cc"))
+local replicatedstorage = game:GetService("ReplicatedStorage")
+local cc = require(replicatedstorage:WaitForChild("cc"))
+local r8limbs = require(script.Parent:WaitForChild("r8limbs"))
+
 local cameracontroller = cc.cameracontroller
 local inputcontroller = cc.inputcontroller
 local interpolation = cc.interpolation
@@ -41,7 +42,7 @@ interpolation.breakpointset({
 interpolation.maxdistance = 1000
 
 --- set base movement values
-ccinput.speed = 32
+ccinput.speed = 24
 ccinput.jumppower = 50
 ccinput.floatpower = 500
 
@@ -366,7 +367,7 @@ end
 --- but for the sake of the demo it gets the job done
 
 --- `{[string stringuserid]: typeof(cc.create())}`
-local playercharacters = {}
+local playercharacters = {} :: {[string]: typeof(cc.create())}
 
 local function replicate(dt: number)
 	debug.profilebegin("cc_replicate")
@@ -378,8 +379,9 @@ local function replicate(dt: number)
 
 	--- set replication focus
 	local replicationfocus = Vector3.zero
-	if localplayer.Character then
-		replicationfocus = localplayer.Character:GetPivot().Position
+	local localcharacter = localplayer.Character
+	if localcharacter then
+		replicationfocus = localcharacter:GetPivot().Position
 	end
 
 	for _, resync in resynccache do
@@ -410,13 +412,16 @@ local function replicate(dt: number)
 				--- move to spawnlocation
 				if islocal then
 					characterrootpart.Anchored = false
-					camera.CameraSubject = character:WaitForChild("Head")
+					local head = character:WaitForChild("Head")
+					camera.CameraSubject = head:IsA("BasePart") and head or nil
 					camera.CameraType = Enum.CameraType.Custom
 
 					cameracontroller.resetcameraangle = true
 
 					local s, e = pcall(function()
 						character:MoveTo(spawnpoint())
+
+						return true
 					end)
 					if not s then warn(e) end
 				else
@@ -426,7 +431,7 @@ local function replicate(dt: number)
 				--- create rig and attach
 				--- ideally this would be a developer-prescribed rig
 				--- but this is just a minimal example
-				local newrig = rig.create()
+				local newrig = rig.create(r8limbs::any)
 				newrig.Parent = character
 
 				local rigroot = newrig:FindFirstChild("RootPart")
@@ -441,12 +446,15 @@ local function replicate(dt: number)
 			else
 				--- destroy if below fallenpartsdestroyheight then skip
 				local character = player.Character
-				local pivot = character:GetPivot()
-				if pivot.Y <= workspace.FallenPartsDestroyHeight or character.PrimaryPart == nil or not character.PrimaryPart:IsDescendantOf(workspace) then
-					player.Character = nil
-					character:Destroy()
+				if character then
+					local pivot = character:GetPivot()
+					local primarypart = character.PrimaryPart
+					if pivot.Y <= workspace.FallenPartsDestroyHeight or primarypart == nil or not primarypart:IsDescendantOf(workspace) then
+						player.Character = nil
+						character:Destroy()
 
-					continue
+						continue
+					end
 				end
 			end
 
@@ -462,19 +470,21 @@ local function replicate(dt: number)
 
 			--- pivot/lerp replicated character
 			if interpolation.cycle % breakpoint.cycle == 0 then
-				local cframe = CFrame.new(position)
 				local character = player.Character
 
-				if breakpoint.interpolate == true then
-					local pivot = character:GetPivot()
+				if character then
+					local cframe = CFrame.new(position)
+					if breakpoint.interpolate == true then
+						local pivot = character:GetPivot()
 
-					if distancefromfocus > interpolation.maxdistance then
-						character:PivotTo(cframe)
+						if distancefromfocus > interpolation.maxdistance then
+							character:PivotTo(cframe)
+						else
+							character:PivotTo(pivot:Lerp(cframe, i))
+						end
 					else
-						character:PivotTo(pivot:Lerp(cframe, i))
+						character:PivotTo(cframe)
 					end
-				else
-					character:PivotTo(cframe)
 				end
 			end
 		else
@@ -538,7 +548,7 @@ local function animate(dt: number)
 		--- soft asserts
 		local character = player.Character
 		if not character then continue end
-		local playerrig: typeof(rig.create())? = character:FindFirstChild("rig")
+		local playerrig = character:FindFirstChild("rig") :: typeof(rig.create(r8limbs::any))?
 		if not playerrig then continue end
 
 		--- resolve rotations
@@ -559,7 +569,9 @@ local function animate(dt: number)
 		end
 		xsign = math.map(xsign, -1, 1, -math.pi/4, math.pi/4)
 
-		local xvalue = character:GetAttribute("xvalue") or 0
+		local xvalue = character:GetAttribute("xvalue")
+		xvalue = type(xvalue) == "number" and xvalue or 0
+		
 		local xreal = math.lerp(xvalue, xsign, i)
 		character:SetAttribute("xvalue", xreal)
 
@@ -575,7 +587,7 @@ local function animate(dt: number)
 
 		--- procedural animationconstraint animation wrt elapsed (os.clock())
 		if animatethisframe then
-			local statestring = replication.statetostring(replication.readstate(resync))::any
+			local statestring = replication.statetostring(replication.readstate(resync::buffer))
 			if statestring == "fly" then
 				if ix == 0 and iz == 0 then
 					statestring = "idle"

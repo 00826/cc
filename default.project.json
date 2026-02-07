@@ -6,7 +6,8 @@
 			"$className": "ReplicatedFirst",
 			"$ignoreUnknownInstances": true,
 			
-			"client": {"$path": "demo/client.client.luau"}
+			"client": {"$path": "demo/client.client.luau"},
+			"r8limbs": {"$path": "demo/r8limbs.luau"}
 		},
 		"ReplicatedStorage": {
 			"$className": "ReplicatedStorage",

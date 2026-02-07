@@ -197,7 +197,7 @@ end
 --- internally-bound by `inputcontroller.rebind(Enum.PreferredInput.KeyboardAndMouse)`
 function inputcontroller.keyboard(action: string, state: Enum.UserInputState, inputobject: InputObject): Enum.ContextActionResult?
 	local entry = inputcontroller.keyboardmap[inputobject.KeyCode]
-	if not entry then return end
+	if not entry then return nil end
 
 	--[[{
 		[1] = forward
@@ -232,7 +232,7 @@ function inputcontroller.gamepad(action: string, state: Enum.UserInputState, inp
 		return Enum.ContextActionResult.Sink
 	end
 
-	if inputobject.KeyCode ~= Enum.KeyCode.Thumbstick1 then return end
+	if inputobject.KeyCode ~= Enum.KeyCode.Thumbstick1 then return nil end
 
 	local inputposition = inputobject.Position
 	local distance = vector.magnitude(inputposition::any)
@@ -249,7 +249,7 @@ end
 --- internally-bound by `inputcontroller.rebind(Enum.PreferredInput.Touch)`
 function inputcontroller.touch(action: string, state: Enum.UserInputState, inputobject: InputObject): Enum.ContextActionResult?
 	local touchgui = inputcontroller.touchgui
-	if not touchgui then return end
+	if not touchgui then return nil end
 
 	local thumbstickframe = (touchgui::any).ThumbstickFrame::Frame
 	local thumbstickframeapos = thumbstickframe.AbsolutePosition
@@ -327,7 +327,7 @@ function inputcontroller.touch(action: string, state: Enum.UserInputState, input
 		circle.Position = UDim2.fromScale(0.5, 0.5)
 	end
 
-	return
+	return nil
 end
 
 --- returns an empty touchgui
@@ -464,6 +464,7 @@ if RunService:IsClient() then
 	do --- resolve touchgui
 		local s, e = pcall(function()
 			local playergui = LocalPlayer:WaitForChild("PlayerGui")
+			assert(playergui:IsA("PlayerGui"), string.format("expected playergui, got %s", playergui.ClassName))
 			local touchgui = inputcontroller.createtouchgui(playergui)
 			
 			inputcontroller.touchgui = touchgui
@@ -493,12 +494,15 @@ if RunService:IsClient() then
 			inputcontroller.preferredinputchanged():Connect(function()
 				touchgui.Enabled = inputcontroller.touchguivisibility[inputcontroller.preferredinput]
 			end)
+
+			return true
 		end)
 		if not s then warn(e) end
 	end
 	do --- resolve virtual cursor
 		local s, e = pcall(function()
 			local playergui = LocalPlayer:WaitForChild("PlayerGui")
+			assert(playergui:IsA("PlayerGui"), string.format("expected playergui, got %s", playergui.ClassName))
 			local virtualcursor = inputcontroller.createvirtualcursor(playergui)
 			
 			inputcontroller.virtualcursor = virtualcursor
@@ -507,6 +511,8 @@ if RunService:IsClient() then
 			if inputcontroller.virtualcursorcanvasgroup then
 				inputcontroller.applyvirtualcursorfromappearance(inputcontroller.virtualcursorappearance, inputcontroller.virtualcursorcanvasgroup)
 			end
+
+			return true
 		end)
 		if not s then warn(e) end
 	end
@@ -524,6 +530,8 @@ if RunService:IsClient() then
 
 			UserInputService.LastInputTypeChanged:Connect(updatepreferredinput)
 			updatepreferredinput(UserInputService:GetLastInputType())
+
+			return true
 		end)
 		if not s then warn(e) end
 	end

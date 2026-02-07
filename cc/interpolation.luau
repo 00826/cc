@@ -12,7 +12,7 @@ local interpolation = {
 	cycle = 0;
 	maxcycle = 60;
 	--- breakpoints set by `interpolation.breakpointset()`
-	breakpoints = {};
+	breakpoints = {} :: {{ distance: number, interpolate: boolean, cycle: number }};
 
 	--- directly pivot instead of lerping if distance between replicated character and replication focus is larger than this value
 	maxdistance = math.huge;

@@ -313,7 +313,7 @@ function cc.step(character: typeof(cc.create()), dt: number)
 
 	local floor = cc.floorcast(character, (sphere.Size.X * 0.5) + input.radiusextend, input.floorcastextend)
 	if floor then
-		if vector.angle(floor.Normal, Vector3.yAxis::any) > input.floorcastslopelimit then
+		if vector.angle(floor.Normal::any, Vector3.yAxis::any) > input.floorcastslopelimit then
 			floor = nil
 		end
 	end

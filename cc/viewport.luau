@@ -43,12 +43,12 @@ local viewport = {
 	--- whitelist raycast params
 	whitelistparams = RaycastParams.new();
 	--- raycastparam whitelist
-	whitelist = table.create(16);
+	whitelist = {};
 
 	--- whitelist raycast params
 	blacklistparams = RaycastParams.new();
 	--- raycastparam blacklist
-	blacklist = table.create(16);
+	blacklist = {};
 }
 
 function viewport.cast(focus: CFrame, targetdistance: number, extrapolatorresult: extrapolatestepresult)
