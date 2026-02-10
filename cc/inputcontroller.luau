@@ -9,15 +9,15 @@ local ContextActionService = game:GetService("ContextActionService")
 local GuiService = game:GetService("GuiService")
 local UserInputService = game:GetService("UserInputService")
 
---- converts vector3 to udim2
+--- converts xy vector to udim2
 @native
-local function touchvectortoudim2(vec: Vector3)
+local function vectorxytoudim2(vec: Vector2|Vector3)
 	return UDim2.fromOffset(vec.X, vec.Y)
 end
 
---- converts vector2 to vector3
+--- converts xy vector to vector3
 @native
-local function vector2tovector3(vec: Vector2)
+local function vectorxytovector3(vec: Vector2|Vector3)
 	return Vector3.new(vec.X, vec.Y, 0)
 end
 
@@ -121,9 +121,21 @@ local inputcontroller = {
 	virtualcursorcanvasgroup = nil :: CanvasGroup?;
 	virtualcursortransparency = 1/3; --- canvasgroup transparency
 	virtualcursorappearance = {
-		{ anchorpoint = Vector2.new(1, 0.5); size = UDim2.fromOffset(2, 24); position = UDim2.fromOffset(32, 32); rotation = 0; color = Color3.fromRGB(255, 255, 255); strokesize = 1; stroketransparency = 0.75; strokecolor = Color3.fromRGB(27, 42, 53); };
-		{ anchorpoint = Vector2.new(1, 0.5); size = UDim2.fromOffset(2, 24); position = UDim2.fromOffset(32, 32); rotation = 90; color = Color3.fromRGB(255, 255, 255); strokesize = 1; stroketransparency = 0.75; strokecolor = Color3.fromRGB(27, 42, 53); };
+		{ anchorpoint = Vector2.new(0.5, 0.5); size = UDim2.fromOffset(2, 24); position = UDim2.fromOffset(32, 32); rotation = 0; color = Color3.fromRGB(255, 255, 255); strokesize = 1; stroketransparency = 0.75; strokecolor = Color3.fromRGB(27, 42, 53); };
+		{ anchorpoint = Vector2.new(0.5, 0.5); size = UDim2.fromOffset(2, 24); position = UDim2.fromOffset(32, 32); rotation = 90; color = Color3.fromRGB(255, 255, 255); strokesize = 1; stroketransparency = 0.75; strokecolor = Color3.fromRGB(27, 42, 53); };
 	};
+
+	--- virtualcursorcanvasgroup.absoluteposition + (virtualcursorcanvasgroup.absolutesize * 0.5)
+	virtualcursorscreenposition = Vector2.zero;
+	--- raycastresult from raycast from virtual cursor viewport position
+	virtualcursorraycastresult = nil :: RaycastResult?;
+	--- length of raycast from virtual cursor viewport position
+	virtualcursorraycastlength = 2^16-1;
+	--- raycastparams used for resolving virtualcursorraycastresult
+	virtualcursorraycastparams = RaycastParams.new();
+
+	--- show debug visuals for resolving virtual cursor raycast
+	virtualcursordebugmode = false;
 
 	--- `Enum.DisplaySize -> touch thumbstick ring size` conversion table
 	thumbstickringmap = {
@@ -255,7 +267,7 @@ function inputcontroller.touch(action: string, state: Enum.UserInputState, input
 	local thumbstickframeapos = thumbstickframe.AbsolutePosition
 	local thumbstickframeasize = thumbstickframe.AbsoluteSize
 
-	local netinset = vector2tovector3(thumbstickframeapos - touchgui.AbsolutePosition)
+	local netinset = vectorxytovector3(thumbstickframeapos - touchgui.AbsolutePosition)
 	local inputposition = inputobject.Position - netinset
 
 	local ring = (thumbstickframe::any).Ring::Frame
@@ -272,7 +284,7 @@ function inputcontroller.touch(action: string, state: Enum.UserInputState, input
 			inputcontroller.touchcurrentposition = inputposition
 			inputcontroller.touchstartposition = inputposition
 
-			local inputudim2 = touchvectortoudim2(inputposition)
+			local inputudim2 = vectorxytoudim2(inputposition)
 			ring.Position = inputudim2
 			circle.Position = inputudim2
 		else
@@ -289,7 +301,7 @@ function inputcontroller.touch(action: string, state: Enum.UserInputState, input
 			local innerradius = inputcontroller.touchdeadzone * radius
 			if distance > radius then
 				local dragpos = inputcontroller.touchstartposition + (direction * (distance - radius))
-				ring.Position = touchvectortoudim2(dragpos)
+				ring.Position = vectorxytoudim2(dragpos)
 				inputcontroller.touchstartposition = dragpos
 			end
 
@@ -300,7 +312,7 @@ function inputcontroller.touch(action: string, state: Enum.UserInputState, input
 				inputcontroller.vector = Vector3.zero
 			end
 
-			local inputudim2 = touchvectortoudim2(inputposition)
+			local inputudim2 = vectorxytoudim2(inputposition)
 			circle.Position = inputudim2
 			
 			return Enum.ContextActionResult.Sink
@@ -401,7 +413,7 @@ function inputcontroller.createvirtualcursor(playergui: PlayerGui)
 	local virtualcursorgui = Instance.new("ScreenGui")
 	virtualcursorgui.Name = "cc_virtualcursorgui"
 	virtualcursorgui.IgnoreGuiInset = true
-	virtualcursorgui.ScreenInsets = Enum.ScreenInsets.None
+	virtualcursorgui.ScreenInsets = Enum.ScreenInsets.DeviceSafeInsets
 	virtualcursorgui.SafeAreaCompatibility = Enum.SafeAreaCompatibility.None
 	virtualcursorgui.ResetOnSpawn = false
 	virtualcursorgui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
@@ -534,6 +546,86 @@ if RunService:IsClient() then
 			return true
 		end)
 		if not s then warn(e) end
+	end
+	do --- resolve virtual cursor screenposition & worldposition
+		local debugsquare = Instance.new("Frame")
+		debugsquare.Name = "cc_debugsquare"
+		debugsquare.Size = UDim2.fromOffset(1, 1)
+		debugsquare.BackgroundColor3 = Color3.fromRGB(255, 0, 255)
+		debugsquare.BorderSizePixel = 1
+		debugsquare.AnchorPoint = Vector2.new(0.5, 0.5)
+		debugsquare.Visible = false
+		debugsquare.Parent = inputcontroller.virtualcursor
+
+		local debugorigin = Instance.new("Part")
+		debugorigin.Name = "cc_debugorigin"
+		debugorigin.Size = Vector3.one
+		debugorigin.Color = Color3.fromRGB(255, 0, 255)
+		debugorigin.Transparency = 1
+		debugorigin.CastShadow = false
+		debugorigin.Anchored = true
+		debugorigin.CanCollide = false
+		debugorigin.CanQuery = false
+		debugorigin.CanTouch = false
+		debugorigin.Parent = workspace
+
+		local debugcone = Instance.new("ConeHandleAdornment")
+		debugcone.Name = "cc_debugcone"
+		debugcone.Adornee = debugorigin
+		debugcone.Height = 0.5
+		debugcone.Radius = 0.25
+		debugcone.Color3 = Color3.fromRGB(255, 0, 255)
+		debugcone.Shading = Enum.AdornShading.XRay
+		debugcone.Visible = false
+		debugcone.Parent = debugorigin
+
+		RunService.RenderStepped:Connect(function()
+			local virtualcursorcanvasgroup = inputcontroller.virtualcursorcanvasgroup
+			if not virtualcursorcanvasgroup then return end
+
+			--- resolve cursor position
+			local vcapos = virtualcursorcanvasgroup.AbsolutePosition
+			local vcasize = virtualcursorcanvasgroup.AbsoluteSize
+
+			vcapos += (vcasize * 0.5) + GuiService:GetGuiInset()
+
+			local camera = workspace.CurrentCamera
+
+			--- resolve raycastresult
+			local unitray = camera:ViewportPointToRay(vcapos.X, vcapos.Y)
+			local origin, direction = unitray.Origin, unitray.Direction
+			local vec = direction * inputcontroller.virtualcursorraycastlength
+			local raycastresult = workspace:Raycast(origin, vec, inputcontroller.virtualcursorraycastparams)
+
+			--- resolve debugsquare/debugcone
+			if inputcontroller.virtualcursordebugmode == true then
+				if debugsquare.Visible == false then
+					debugsquare.Visible = true
+				end
+				if debugcone.Visible == false then
+					debugcone.Visible = true
+				end
+
+				debugsquare.Position = vectorxytoudim2(vcapos)
+				if raycastresult then
+					debugcone.CFrame = CFrame.lookAlong(raycastresult.Position, raycastresult.Normal)
+				else
+					debugcone.CFrame = CFrame.lookAlong(origin + vec, direction)
+				end
+			else
+				if debugsquare.Visible == true then
+					debugsquare.Visible = false
+					debugsquare.Position = UDim2.fromOffset(0, 0)
+				end
+				if debugcone.Visible == true then
+					debugcone.Visible = false
+					debugcone.CFrame = CFrame.identity
+				end
+			end
+
+			inputcontroller.virtualcursorscreenposition = vcapos
+			inputcontroller.virtualcursorraycastresult = raycastresult
+		end)
 	end
 	do --- reset inputs on changes
 		UserInputService.TextBoxFocused:Connect(inputcontroller.reset)

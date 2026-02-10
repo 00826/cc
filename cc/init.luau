@@ -1,7 +1,7 @@
 --!strict
 
 local RunService = game:GetService("RunService")
-local IsServer = RunService:IsServer()
+local isserver = RunService:IsServer()
 
 --- returns unit vector from input vector `i`, relative to viewport `lookvector, -upvector`
 @native
@@ -46,10 +46,10 @@ local cc = {
 	replication = require(script:WaitForChild("replication"));
 	interpolation = require(script:WaitForChild("interpolation"));
 
-	rig = not IsServer and require(script:WaitForChild("rig")) or nil;
-	cameracontroller = not IsServer and require(script:WaitForChild("cameracontroller")) or nil;
-	inputcontroller = not IsServer and require(script:WaitForChild("inputcontroller")) or nil;
-	viewport = not IsServer and require(script:WaitForChild("viewport")) or nil;
+	rig = not isserver and require(script:WaitForChild("rig")) or nil;
+	cameracontroller = not isserver and require(script:WaitForChild("cameracontroller")) or nil;
+	inputcontroller = not isserver and require(script:WaitForChild("inputcontroller")) or nil;
+	viewport = not isserver and require(script:WaitForChild("viewport")) or nil;
 
 	input = {
 		--- empty raycastparams

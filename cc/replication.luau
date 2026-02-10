@@ -3,7 +3,7 @@
 
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
-local IsServer = RunService:IsServer()
+local isserver = RunService:IsServer()
 
 local Remote = script.Parent:WaitForChild("Remote")
 
@@ -399,7 +399,7 @@ function replication.resyncremovebyuserid(userid: number)
 end
 
 --- replication
-if IsServer then
+if isserver then
 	local recent = os.clock() - replication.serversendrate
 	RunService.Heartbeat:Connect(function()
 		local now = os.clock()
