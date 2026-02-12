@@ -43,13 +43,17 @@ local replication = {
 	--- cached resync replication buffers
 	resynccache = table.create(1 + Players.MaxPlayers) :: {buffer};
 
+	--- replication buffer snapshots
+	snapshots = {} :: {[string]: {buffer}};
+	snapshotlifetime = 1000;
+
 	--- u24 vector precision
 	precision = 1/40;
 
 	--- `client replication buffer -> server` send rate
 	clientsendrate = 1/30;
 	--- `server replication buffers -> clients`
-	serversendrate = 1/15;
+	serversendrate = 1/20;
 
 	--- replication states
 	states = {
@@ -66,6 +70,8 @@ local replication = {
 	resyncreplicationoffset = 0;
 	resyncuseridoffset = 12;
 	resynctimeoffset = 20;
+
+	snapshottimestampoffset = 12;
 
 	--- unreliableremoteevent byte limit
 	unreliablebytelimit = 1000;
@@ -308,15 +314,20 @@ function replication.createbigbuffer()
 end
 
 --- allocates resync buffers from resynccache to bigbuffer
-function replication.bigbufferalloc(b: buffer, allocate: number)
+function replication.bigbufferalloc(b: buffer, allocate: number, timestamp: number)
 	if allocate > 0 then
 		local len = replication.resynctimeoffset
-		local offset = (allocate - 1) *len
+		local offset = (allocate - 1) * len
 		local resync = table.remove(replication.resynccache, 1)
 		if resync then
+			--- copy into bigbuffer
 			buffer.copy(b, offset, resync, 0, len)
+			--- create-and-insert snapshot
+			local snapshot = replication.createsnapshotbuffer(resync, timestamp)
+			local userid = replication.resyncreaduserid(resync)
+			replication.snapshotinsert(userid, snapshot)
 
-			replication.bigbufferalloc(b, allocate - 1)
+			replication.bigbufferalloc(b, allocate - 1, timestamp)
 		else
 			return
 		end
@@ -331,18 +342,25 @@ function replication.bigbufferserverresync(player: Player, challengereplication:
 	assert(buffer.len(challengereplication) == replication.resyncuseridoffset, "cc replication buffer len mismatch")
 
 	local userid = player.UserId
+	local stringuserid = tostring(userid)
+	--- create snapshot if not created by playeradded
+	if not replication.snapshots[stringuserid] then
+		replication.snapshots[stringuserid] = replication.createsnapshotalloc()
+	end
+
+	--- resync replication
 	local index, resync = replication.findbyuserid(userid)
 	if index and resync then
 		replication.resyncwritereplication(resync, challengereplication)
 	else
 		resync = replication.createresyncbuffer()
-		assert(resync) --- ts ts
+		if type(resync) == "buffer" then --- ts ts
+			replication.resyncwritereplication(resync, challengereplication)
+			replication.resyncwriteuserid(resync, userid)
+			--- replication.resyncwritetime(resync, 0) --- unnecessary
 
-		replication.resyncwritereplication(resync, challengereplication)
-		replication.resyncwriteuserid(resync, userid)
-		--- replication.resyncwritetime(resync, 0) --- unnecessary
-
-		table.insert(replication.resynccache, resync)
+			table.insert(replication.resynccache, resync)
+		end
 	end
 end
 
@@ -398,6 +416,148 @@ function replication.resyncremovebyuserid(userid: number)
 	end
 end
 
+--- creates a snapshot buffer
+--- ```
+--- key    replication buffer  timestamp
+--- bytes  [00000000 0000]     [00000000]   
+--- range  [0 .. 11]           [12 .. 19]   
+--- value  [...]               [f64]        
+--- ```
+function replication.createsnapshotbuffer(r: buffer?, timestamp: number?)
+	local s = buffer.create(20)
+
+	if r then
+		replication.snapshotwritereplication(s, r)
+	end
+	if timestamp then
+		replication.snapshotwritetimestamp(s, timestamp)
+	end
+
+	return s
+end
+
+--- returns space-allocated table wrt `replication.snapshotlifetime` and `replication.serversendrate` \
+function replication.createsnapshotalloc()
+	return table.create(1 + (replication.snapshotlifetime / 1000) * (replication.serversendrate) // 1)::{buffer}
+end
+
+--- writes replication to snapshot buffer
+function replication.snapshotwritereplication(snapshot: buffer, r: buffer)
+	buffer.copy(snapshot, 0, r, 0, replication.snapshottimestampoffset)
+end
+
+--- reads replication from snapshot buffer
+function replication.snapshotreadreplication(snapshot: buffer)
+	local r = replication.create()
+	buffer.copy(r, 0, snapshot, 0, replication.snapshottimestampoffset)
+
+	return r
+end
+
+--- writes timestamp to snapshot buffer
+function replication.snapshotwritetimestamp(snapshot: buffer, timestamp: number)
+	buffer.writef64(snapshot, replication.snapshottimestampoffset, timestamp)
+end
+
+--- reads timestamp from snapshot buffer
+function replication.snapshotreadtimestamp(snapshot: buffer)
+	return buffer.readf64(snapshot, replication.snapshottimestampoffset)
+end
+
+--- adds snapshot buffer to array of snapshot buffers associated with userid
+function replication.snapshotinsert(userid: number, snapshot: buffer)
+	local stringuserid = tostring(userid)
+
+	local snapshots = replication.snapshots[stringuserid]
+	if snapshots then
+		table.insert(snapshots, 1, snapshot)
+	else
+		--- shouldve been allocated in replication.bigbufferserverresync()
+		--- isnt checked here bc the code calling this function runs hot
+	end
+end
+
+--- removes expired snapshots from array
+function replication.snapshotflush(snapshots: {buffer}, timestamp: number)
+	for i = #snapshots, 1, -1 do
+		local s = snapshots[i]
+		local elapsed = timestamp - replication.snapshotreadtimestamp(s)
+		if elapsed > replication.snapshotlifetime then
+			table.remove(snapshots, i)
+		else
+			break
+		end
+	end
+end
+
+--- reads interpolated position between `a` and `b` wrt interpolant `t`
+function replication.snapshotreadposition(a: buffer, b: buffer, t: number)
+	local apos = replication.readposition(a)
+	local bpos = replication.readposition(b)
+
+	return (vector.lerp(apos::any, bpos::any, t)::any)::Vector3
+end
+
+--- performs binary search on snapshots, starting at `i (?=1)` and ending at `j (?=#t)` \
+--- returns: \
+--- index `a` of the snapshot that is closest to `timestamp` \
+--- index `b` of the snapshot next-closest to `timestamp` \
+--- interpolant `t` describing the position `[0, 1]` of `timestamp` between `a` and `b`
+function replication.snapshotnearestbinarysearch(snapshots: {buffer}, timestamp: number, i: number?, j: number?)
+	i = i or 1
+	j = j or #snapshots
+	
+	if i > j then
+		return nil::number?, nil::number?, nil::number?
+	else
+		local index = (i + j) // 2
+		local snapshot = snapshots[index]
+		local stimestamp = replication.snapshotreadtimestamp(snapshot)
+		
+		if stimestamp == timestamp then
+			return index, index, 0
+		elseif stimestamp < timestamp then
+			i = index + 1
+
+			local next = snapshots[i]
+			if next ~= nil then
+				local nexttimestamp = replication.snapshotreadtimestamp(next)
+				if nexttimestamp > timestamp then
+					local adelta = math.abs(stimestamp - timestamp)
+					local bdelta = math.abs(nexttimestamp - timestamp)
+					local time = math.map(timestamp, stimestamp, nexttimestamp, 0, 1)
+
+					if adelta < bdelta then
+						return index, i, time
+					else
+						return i, index, time
+					end
+				end
+			end
+		elseif stimestamp > timestamp then
+			j = index - 1
+
+			local prev = snapshots[j]
+			if prev ~= nil then
+				local prevtimestamp = replication.snapshotreadtimestamp(prev)
+				if prevtimestamp < timestamp then
+					local adelta = math.abs(stimestamp - timestamp)
+					local bdelta = math.abs(prevtimestamp - timestamp)
+					local time = math.map(timestamp, stimestamp, prevtimestamp, 0, 1)
+
+					if adelta < bdelta then
+						return index, j, time
+					else
+						return j, index, time
+					end
+				end
+			end
+		end
+		
+		return replication.snapshotnearestbinarysearch(snapshots, timestamp, i, j)
+	end
+end
+
 --- replication
 if isserver then
 	local recent = os.clock() - replication.serversendrate
@@ -411,19 +571,32 @@ if isserver then
 			replication.resyncstep(dt)
 			
 			--- create bigbuffer and allocate
+			local unixtimestampmillis = DateTime.now().UnixTimestampMillis
 			local bigbuffer, allocate = replication.createbigbuffer()
-			replication.bigbufferalloc(bigbuffer, allocate)
+			replication.bigbufferalloc(bigbuffer, allocate, unixtimestampmillis)
 
+			--- resync bigbuffer
 			if allocate > 0 then
 				Remote:FireAllClients(bigbuffer)
+			end
+			
+			--- flush expired
+			for stringuserid, snapshots in replication.snapshots do
+				replication.snapshotflush(snapshots, unixtimestampmillis)
 			end
 		end
 	end)
 
 	Remote.OnServerEvent:Connect(replication.bigbufferserverresync)
 
+	Players.PlayerAdded:Connect(function(player: Player)
+		local userid = player.UserId
+		replication.snapshots[tostring(userid)] = replication.createsnapshotalloc()
+	end)
 	Players.PlayerRemoving:Connect(function(player: Player)
-		replication.resyncremovebyuserid(player.UserId)
+		local userid = player.UserId
+		replication.resyncremovebyuserid(userid)
+		replication.snapshots[tostring(userid)] = nil
 	end)
 else
 	local recent = os.clock() - replication.clientsendrate
