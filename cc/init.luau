@@ -124,8 +124,13 @@ local cc = {
 	collisiongroup = "Default";
 
 	sphere = script:WaitForChild("Sphere");
-	spheremeshid = "rbxassetid://122701517143775"; --- break glass in case of rojo
-	spherecollisionfidelity = Enum.CollisionFidelity.Hull; --- break glass in case of rojo
+	--- sphere mesh properties \
+	--- break glass in case of rojo; none of these can be set during runtime
+	sphereconfig = {
+		spheremeshid = "rbxassetid://124869439513703";
+		spherecollisionfidelity = Enum.CollisionFidelity.Hull;
+		sphererenderfidenlity = Enum.RenderFidelity.Performance;
+	};
 
 	spheretransparency = 2/3; --- 1
 	roottransparency = 1; --- 1
@@ -138,6 +143,7 @@ function cc.create()
 	local sphere = cc.sphere:Clone()
 	sphere.Name = "Sphere"
 	sphere.Transparency = cc.spheretransparency
+	sphere.Anchored = false
 	sphere.Parent = character
 	local sphereattachment = Instance.new("Attachment")
 	sphereattachment.Name = "SphereAttachment1"

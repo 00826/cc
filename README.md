@@ -66,7 +66,13 @@ this is because most games have developer-prescribed jump buttons (but not a thu
 ## fast rig setup
 
 [cc/rig.luau](cc/rig.luau) creates rigs from pure tables and comes with a r6 preset without humanoid bloat
-[cc-rig-unwrap.png](cc-rig-unwrap.png) is a blank clothing template for the default limbs found in `cc/rig.luau` (torso, left arm, left leg, right arm, right leg)
+
+## extras
+
+[extras/rig.blend](extras/rig.blend) is a blender file containing the limbs used in `demo/r8limbs.luau` \
+[extras/sphere480.fbx](extras/sphere480.fbx) is a 480-triangle pill hitbox used by cc characters \
+[extras/cc-rig-unwrap.png](extras/cc-rig-unwrap.png) is a blank clothing template for the default limbs found in `cc/rig.luau` (torso, left arm, left leg, right arm, right leg) \
+[extras/cc-demo-scripts.rbxm](extras/cc-demo-scripts.rbxm) is a standalone rbxm file containing cc and the demo scripts as an import solution for devs that don't use rojo
 
 ## demo game
 
