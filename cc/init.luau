@@ -301,8 +301,8 @@ function cc.floorcast(character: typeof(cc.create()), radius: number, heightexte
 	return workspace:Spherecast(topposition, radius, -upvector * height, cc.input.raycastparams)
 end
 
---- advances character by `dt`
-function cc.step(character: typeof(cc.create()), dt: number)
+--- advances character
+function cc.step(character: typeof(cc.create()))
 	local input = cc.input
 	local output = cc.output
 

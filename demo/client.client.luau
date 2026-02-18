@@ -35,12 +35,6 @@ interpolation.breakpointset({
 	interpolation.createbreakpoint(1200, false, 4); --- if interpolation target is within 1200 studs, pivot every 4 frames. this is also the fallback if target is beyond the range of all breakpoints
 })
 
---- set pivot-instead-of-lerp distance;
---- if distance between replication focus and replicated character is larger than this value
---- it will not be lerped toward its replication target and instead directly pivoted (regardless of its interpolation breakpoint)
---- this is to avoid lerping characters that don't need to be lerped
-interpolation.maxdistance = 1000
-
 --- set base movement values
 ccinput.speed = 24
 ccinput.jumppower = 50
@@ -281,8 +275,8 @@ local function step(dt: number)
 	--- if the player-character is dead or the client is in a state where
 	--- it shouldnt be allowed to apply movement inputs
 
-	--- step character by dt
-	cc.step(character, dt)
+	--- step character
+	cc.step(character)
 
 	--- write values to local replication buffer after stepping character
 	local r = replication.self
@@ -361,88 +355,107 @@ end
 --- cache of player-character models;
 --- because characters are instantiated on the client, (all the server does is emit buffers)
 --- player-characters aren't destroyed when a player leaves
---- because, from the perspective of the server, characters don't exist.
---- so handling player-character destruction has to be handled per-client
---- caching-by-string-userid is not the prettiest way to do things
---- but for the sake of the demo it gets the job done
+--- because, from the perspective of the server, characters don't exist
 
 --- `{[string stringuserid]: typeof(cc.create())}`
 local playercharacters = {} :: {[string]: typeof(cc.create())}
 
-local function replicate(dt: number)
-	debug.profilebegin("cc_replicate")
-	interpolation.cycle += 1
+--- removes player-character associated with this player with option to destroy the instance
+local function removeplayercharacter(player: Player, destroy: boolean)
+	local stringuserid = tostring(player.UserId)
 
-	--- resolve framerate-independent interpolant for this replication frame
-	local resetcycle = interpolation.cycle % interpolation.maxcycle == 0
-	local i = interpolation.i(dt)
+	player.Character = nil
+	if destroy == true then
+		local character = playercharacters[stringuserid]
+		if character then
+			character:Destroy()
+		end
+	end
+	playercharacters[stringuserid] = nil
+end
 
-	--- set replication focus
-	local replicationfocus = Vector3.zero
-	local localcharacter = localplayer.Character
-	if localcharacter then
-		replicationfocus = localcharacter:GetPivot().Position
+--- connect removeplayercharacter to playerremoving signal
+Players.PlayerRemoving:Connect(function(player: Player)
+	removeplayercharacter(player, true)
+end)
+
+--- creates a player-character for this player
+local function createplayercharacter(player: Player)
+	local userid = player.UserId
+	
+	local character = cc.create()
+	assert(character)
+	character.Name = player.Name
+	character.Parent = cc.container
+	player.Character = character
+
+	--- cache and connect function to uncache when destroyed
+	playercharacters[tostring(userid)] = character
+	character.Destroying:Once(function()
+		removeplayercharacter(player, false)
+	end)
+
+	local characterrootpart = character:FindFirstChild("RootPart")
+	assert(characterrootpart and characterrootpart:IsA("BasePart"))
+
+	--- localcharacter case
+	--- set camerasubject
+	--- move to spawnlocation
+	if player == localplayer then
+		characterrootpart.Anchored = false
+		local head = character:WaitForChild("Head")
+		camera.CameraSubject = head:IsA("BasePart") and head or nil
+		camera.CameraType = Enum.CameraType.Custom
+
+		cameracontroller.resetcameraangle = true
+
+		character:MoveTo(spawnpoint())
+	else
+		characterrootpart.Anchored = true
 	end
 
+	--- create rig and attach
+	--- ideally this would be a developer-prescribed rig
+	--- but this is just a minimal example
+	local newrig = rig.create(r8limbs::any)
+	newrig.Parent = character
+
+	local rigroot = newrig:FindFirstChild("RootPart")
+	assert(rigroot and rigroot:IsA("BasePart"))
+	local rootattachment = rigroot:FindFirstChild("RootAttachment")
+	assert(rootattachment and rootattachment:IsA("Attachment"))
+	
+	local rigjoint = characterrootpart:FindFirstChild("RigJoint")
+	assert(rigjoint and rigjoint:IsA("AnimationConstraint"))
+
+	rigjoint.Attachment1 = rootattachment
+
+	return character
+end
+
+local function instantiateandreplicate(dt: number)
+	debug.profilebegin("cc_instantiateandreplicate")
+
+	--- resolve framerate-independent interpolant for this replication frame
+	local t = interpolation.interpolant(dt)
+	--- step interpolation frame
+	local frame = interpolation.step()
+
+	--- set focus to camera position
+	local focus = camera.CFrame.Position
+
+	--- iterate over resynced (`server -> client`) resync buffers
+	--- find associated player, apply character or destroy character
+	--- resolve breakpoint wrt distance from focus
+	--- pivot character to resync buffer position
 	for _, resync in resynccache do
 		local userid = replication.resyncreaduserid(resync)
 		local player = Players:GetPlayerByUserId(userid)
 		if player then
 			local islocal = player == localplayer
+			--- create character if dne
 			if not playercharacters[tostring(userid)] then
-				--- create character if dne
-				local character = cc.create()
-				assert(character)
-				character.Name = player.Name
-				character.Parent = cc.container
-				player.Character = character
-
-				--- cache and connect function to uncache when destroyed
-				playercharacters[tostring(userid)] = character
-				character.Destroying:Once(function()
-					player.Character = nil
-					playercharacters[tostring(userid)] = nil
-				end)
-
-				local characterrootpart = character:FindFirstChild("RootPart")
-				assert(characterrootpart and characterrootpart:IsA("BasePart"))
-
-				--- localcharacter case
-				--- set camerasubject
-				--- move to spawnlocation
-				if islocal then
-					characterrootpart.Anchored = false
-					local head = character:WaitForChild("Head")
-					camera.CameraSubject = head:IsA("BasePart") and head or nil
-					camera.CameraType = Enum.CameraType.Custom
-
-					cameracontroller.resetcameraangle = true
-
-					local s, e = pcall(function()
-						character:MoveTo(spawnpoint())
-
-						return true
-					end)
-					if not s then warn(e) end
-				else
-					characterrootpart.Anchored = true
-				end
-
-				--- create rig and attach
-				--- ideally this would be a developer-prescribed rig
-				--- but this is just a minimal example
-				local newrig = rig.create(r8limbs::any)
-				newrig.Parent = character
-
-				local rigroot = newrig:FindFirstChild("RootPart")
-				assert(rigroot and rigroot:IsA("BasePart"))
-				local rootattachment = rigroot:FindFirstChild("RootAttachment")
-				assert(rootattachment and rootattachment:IsA("Attachment"))
-				
-				local rigjoint = characterrootpart:FindFirstChild("RigJoint")
-				assert(rigjoint and rigjoint:IsA("AnimationConstraint"))
-
-				rigjoint.Attachment1 = rootattachment
+				createplayercharacter(player)
 			else
 				--- destroy if below fallenpartsdestroyheight then skip
 				local character = player.Character
@@ -450,71 +463,188 @@ local function replicate(dt: number)
 					local pivot = character:GetPivot()
 					local primarypart = character.PrimaryPart
 					if pivot.Y <= workspace.FallenPartsDestroyHeight or primarypart == nil or not primarypart:IsDescendantOf(workspace) then
-						player.Character = nil
-						character:Destroy()
+						removeplayercharacter(player, true)
 
 						continue
 					end
 				end
 			end
 
-			--- early skip if islocal as local character is never pivoted
-			if islocal then continue end
+			if islocal then
+				--- do nothing, local character is never pivoted
+			else
+				--- read replicated character position
+				local position = replication.readposition(resync)
 
-			--- read replicated character position
-			local position = replication.readposition(resync)
+				--- resolve breakpoint
+				local distancefromfocus = vector.magnitude(position::any - focus::any)
+				local breakpoint = interpolation.breakpointresolve(distancefromfocus)
 
-			--- resolve breakpoint
-			local distancefromfocus = vector.magnitude(position::any - replicationfocus::any)
-			local breakpoint = interpolation.breakpointresolve(distancefromfocus)
+				--- pivot/lerp replicated character wrt breakpoint frame
+				if frame % breakpoint.frame == 0 then
+					local character = player.Character
 
-			--- pivot/lerp replicated character
-			if interpolation.cycle % breakpoint.cycle == 0 then
-				local character = player.Character
+					if character then
+						local cframe = CFrame.new(position)
+						if breakpoint.interpolate == true then
+							local pivot = character:GetPivot()
 
-				if character then
-					local cframe = CFrame.new(position)
-					if breakpoint.interpolate == true then
-						local pivot = character:GetPivot()
-
-						if distancefromfocus > interpolation.maxdistance then
-							character:PivotTo(cframe)
+							character:PivotTo(pivot:Lerp(cframe, t))
 						else
-							character:PivotTo(pivot:Lerp(cframe, i))
+							character:PivotTo(cframe)
 						end
-					else
-						character:PivotTo(cframe)
 					end
 				end
 			end
 		else
-			--- attempt to replicate non-player character
-			--- out of scope for demo case
-			continue
+			--- attempt to replicate non-player character `id == 0` \
+			--- or player associated with this resync buffer does not exist `Players:GetPlayerByUserId(id) == nil`
 		end
-	end
-	
-	if resetcycle then
-		interpolation.cycle = 0
 	end
 
 	debug.profileend()
 end
 
-RunService.Heartbeat:Connect(replicate)
-
-Players.PlayerRemoving:Connect(function(player: Player)
-	local stringuserid = tostring(player.UserId)
-	local character = playercharacters[stringuserid]
-	if character then
-		character:Destroy()
-		playercharacters[stringuserid] = nil
-	end
-end)
+RunService.Heartbeat:Connect(instantiateandreplicate)
 
 --- basic animation pattern
 --- always applies strafing/rotations
 --- but limb transforms are set every framerate
+
+local angleflag = "rig_angle"
+local maxvelocityflag = "rig_maxvelocity"
+
+--- solves motor6d.desiredangle
+local function solveanimationconstraintdesiredangle(motor: AnimationConstraint, desiredangle: number)
+	local currentangle = (motor:GetAttribute(angleflag) or 0) :: number
+	local maxvelocity = (motor:GetAttribute(maxvelocityflag) or 0) :: number
+
+	if desiredangle > currentangle then
+		currentangle += maxvelocity * 1
+		if currentangle > desiredangle then
+			currentangle = desiredangle
+		end
+	elseif desiredangle < currentangle then
+		currentangle += maxvelocity * -1
+		if currentangle < desiredangle then
+			currentangle = desiredangle
+		end
+	else
+		currentangle = desiredangle
+	end
+
+	motor:SetAttribute(angleflag, currentangle)
+	return currentangle
+end
+
+--- advances rig animation constraint transforms wrt elapsed time
+local function stepanimationconstraints(
+	r: typeof(rig.create(...)),
+	state: "idle" | "walk" | "fall" | "seat" | "fly",
+	crouched: boolean,
+	toolpose: "none" | "left" | "right" | "both",
+	elapsed: number,
+	freq: number?
+)
+	local root = r:FindFirstChild("RootPart") :: BasePart
+	local rootjoint = root:FindFirstChild("RootJoint") :: AnimationConstraint
+
+	local torso = r:FindFirstChild("Torso") :: BasePart
+	local neck = torso:FindFirstChild("Neck") :: AnimationConstraint
+	local rightshoulder = torso:FindFirstChild("RightShoulder") :: AnimationConstraint
+	local righthip = torso:FindFirstChild("RightHip") :: AnimationConstraint
+	local leftshoulder = torso:FindFirstChild("LeftShoulder") :: AnimationConstraint
+	local lefthip = torso:FindFirstChild("LeftHip") :: AnimationConstraint
+
+	if (not neck)
+	or (not rightshoulder)
+	or (not righthip)
+	or (not leftshoulder)
+	or (not lefthip)
+	then
+		return
+	end
+
+	if state == "seat" then
+		rightshoulder:SetAttribute(maxvelocityflag, 0.15)
+		leftshoulder:SetAttribute(maxvelocityflag, 0.15)
+		--- rightshoulder.DesiredAngle = math.pi/2
+		--- leftshoulder.DesiredAngle = -math.pi/2
+		--- righthip.DesiredAngle = math.pi/2
+		--- lefthip.DesiredAngle = -math.pi/2
+		rightshoulder.Transform = CFrame.fromOrientation(0, 0, math.pi/2)
+		leftshoulder.Transform = CFrame.fromOrientation(0, 0, -math.pi/2)
+		righthip.Transform = CFrame.fromOrientation(0, 0, math.pi/2)
+		lefthip.Transform = CFrame.fromOrientation(0, 0, -math.pi/2)
+
+		return
+	end
+	
+	local addhipangle = 0
+
+	if (crouched)
+	then
+		neck:SetAttribute(maxvelocityflag, 0.5)
+		rootjoint:SetAttribute(maxvelocityflag, 0.5)
+		addhipangle = math.pi/4
+		neck.Transform = CFrame.fromOrientation(solveanimationconstraintdesiredangle(neck, -math.pi/4), 0, 0)
+		rootjoint.Transform = CFrame.new(0, 0, -0.25) * CFrame.fromOrientation(solveanimationconstraintdesiredangle(rootjoint, math.pi/4), 0, 0)
+	else
+		neck:SetAttribute(maxvelocityflag, 0.5)
+		rootjoint:SetAttribute(maxvelocityflag, 0.5)
+		addhipangle = 0
+		neck.Transform = CFrame.fromOrientation(solveanimationconstraintdesiredangle(neck, 0), 0, 0)
+		rootjoint.Transform = CFrame.fromOrientation(solveanimationconstraintdesiredangle(rootjoint, 0), 0, 0)
+	end
+  
+	if (state == "fall") then
+		rightshoulder:SetAttribute(maxvelocityflag, 0.5)
+		leftshoulder:SetAttribute(maxvelocityflag, 0.5)
+
+		if (crouched) then
+			local approxangle = 0.1 * math.sin(elapsed * 1)
+			rightshoulder.Transform = CFrame.fromOrientation(0, 0, approxangle)
+			leftshoulder.Transform = CFrame.fromOrientation(0, 0, approxangle)
+		else
+			rightshoulder.Transform = CFrame.fromOrientation(0, 0, math.pi)
+			leftshoulder.Transform = CFrame.fromOrientation(0, 0, -math.pi)
+		end
+		righthip.Transform = CFrame.fromOrientation(0, 0, addhipangle)
+		lefthip.Transform = CFrame.fromOrientation(0, 0, -addhipangle)
+
+		return
+	end
+
+	local amplitude, frequency
+	
+	if state == "idle" then
+		amplitude = 0.1
+		frequency = 1
+	else
+		rightshoulder:SetAttribute(maxvelocityflag, 0.15)
+		leftshoulder:SetAttribute(maxvelocityflag, 0.15)
+		amplitude = 1 * (crouched and 0.5 or 1)
+		frequency = (freq and freq or 9) * (crouched and 0.5 or 1) --- [6, 9, 12]
+	end
+
+	local desiredangle = amplitude * math.sin(elapsed * frequency)
+
+	rightshoulder.Transform = CFrame.fromOrientation(0, 0, desiredangle)
+	leftshoulder.Transform = CFrame.fromOrientation(0, 0, desiredangle)
+	righthip.Transform = CFrame.fromOrientation(0, 0, -(desiredangle - addhipangle))
+	lefthip.Transform = CFrame.fromOrientation(0, 0, -(desiredangle + addhipangle))
+
+	if toolpose == "none" then
+
+	elseif toolpose == "right" then
+		rightshoulder.Transform = CFrame.fromOrientation(0, 0, math.pi/2)
+	elseif toolpose == "left" then
+		leftshoulder.Transform = CFrame.fromOrientation(0, 0, -math.pi/2)
+	elseif toolpose == "both" then
+		rightshoulder.Transform = CFrame.fromOrientation(0, 0, math.pi/2)
+		leftshoulder.Transform = CFrame.fromOrientation(0, 0, -math.pi/2)
+	end
+end
 
 local framerate = 1/24
 local elapsed = 0
@@ -597,7 +727,7 @@ local function animate(dt: number)
 			end
 
 			task.defer(
-				rig.stepanimationconstraints,
+				stepanimationconstraints,
 				playerrig,
 				statestring::any,
 				iy == 2 or iy == 3 or false,

@@ -1,18 +1,15 @@
 # ccㅤ/character controller/
 
-humanoidless character controller+replicator and strictly-typed playermodule rewrite
+humanoidless character controller+replicator
 
-## about
-
-|ico.svg|lore|
+|ico.svg|contents|
 |-|-|
-|<img src="./cc-ico.svg" width="96"/>|humanoidless player-character controller and replicator as a simple all-in-one-place alternative to the roblox `PlayerModule` and `Humanoid`|
+|<img src="./cc-ico.svg" width="96"/>|setup: [setup.md](setup.md)<br/><br/>rbxm: [extras/cc-demo-scripts.rbxm](extras/cc-demo-scripts.rbxm)<br/>demo: [https://www.roblox.com/games/104949334668691/cc-demo](https://www.roblox.com/games/104949334668691/cc-demo)|
 
 ## gotchas
 
-1. an empty fork of the playermodule is required for any project using cc
-
-this is because cc uses a minimal rewrite/functionality of the roblox `PlayerModule` (and therefore has conflicts with it)
+### 1. playermodule conflict
+cc has a self-contained `PlayerModule` functionality ([cc/cameracontroller.luau](cc/cameracontroller.luau), [cc/inputcontroller.luau](cc/inputcontroller.luau), [cc/viewport.luau](cc/viewport.luau)) and therefore conflicts with the default roblox `PlayerModule`. as such, an empty fork should be placed in `StarterPlayer/StarterPlayerScripts`:
 
 ```json
 "StarterPlayer": {
@@ -25,59 +22,24 @@ this is because cc uses a minimal rewrite/functionality of the roblox `PlayerMod
 }
 ```
 
-2. [cc.replication.luau](cc/replication.luau) must be required on the server
+### 2. position limits
 
-cc.replication controls the server-side of cc's replication
+replicated positions are represented as `i24`'s (breakdown of the replication buffer can be viewed in [cc/replication.luau](cc/replication.luau)'s `replication.create()`). any positional component that is written beyond this limit will apply integer overflow. the range can be expanded by increasing `replication.precision` at the expense of visual accuracy
 
-3. i do not know how to write comprehensive or proper documentation for a project of this nature
+by default, integer overflow for replicated positions will occur when a point-along-an-axis is `~= ±209714.2` studs away from `0`
 
-because of this some annotations are on the more verbose side hopefully for better clarity. also for some variables used in the playermodule rewrite i have tried to include their original variable name so it's easier to trace where something came from
+`limitalongaxis = replication.precision * 2^23-1`
 
-4. mobile thumbstick is provided ootb, mobile jump button is not
+### 3. lack of vr support
 
-this is because most games have developer-prescribed jump buttons (but not a thumbstick of the same nature) and i do not want cc to conflict with that piece of screen real estate
+vr is not supported (no vr headset T_T), but will most definitely be added when i have the means to do so
 
-5. vr is not supported (no vr headset T_T), but will most definitely be added when i have the means to do so
+## setup
 
-## interfacing
+a step-by-step guide for implementing cc from scratch or into a preexisting project
 
-[cc/init.luau](cc/init.luau) contains cc mutator and step functions and runs the client/server replication process when required by the client/server \
-`cc.input` is the input table read from by the `cc` mutator functions and is meant to be written to externally \
-`cc.output` is the output table written to during `cc.step(...)` and is meant to be read from externally
-
-`cc.step()` works best when bound to `RunService.Heartbeat`, as binding it to renderstep at any renderpriority causes character jitter and binding it to stepped causes characters to fling when jumping
-
-## general script overview
-
-[cc/cameracontroller.luau](cc/cameracontroller.luau) \
-[cc/inputcontroller.luau](cc/inputcontroller.luau) \
-[cc/viewport.luau](cc/viewport.luau) \
-...are parts of a minimal rewrite of roblox's `PlayerModule`
-
-[cc/cameracontroller.luau](cc/cameracontroller.luau) controls the camera based on inputs read from [cc/inputcontroller.luau](cc/inputcontroller.luau) \
-[cc/viewport.luau](cc/viewport.luau) is the equivalent of the playermodule poppercam and queries the camera viewport in order to artificially limit camera zoom distance
-
-[cc/interpolation.luau](cc/interpolation.luau) is a general solver for interpolating replicated characters, intended for external use. a general use pattern is provided in the client demo script \
-[cc/replication.luau](cc/replication.luau) controls the character replication between clients using heavily space-optimized buffers
-
-[demo/client.client.luau](demo/client.client.luau) contains a general use pattern for cc, and is the script used in the demo game (linked below) \
-[demo/server.server.luau](demo/server.server.luau) satisfies `gotcha #2`
-
-## fast rig setup
-
-[cc/rig.luau](cc/rig.luau) creates rigs from pure tables and comes with a r6 preset without humanoid bloat
-
-## extras
-
-[extras/rig.blend](extras/rig.blend) is a blender file containing the limbs used in `demo/r8limbs.luau` \
-[extras/sphere480.fbx](extras/sphere480.fbx) is a 480-triangle pill hitbox used by cc characters \
-[extras/cc-rig-unwrap.png](extras/cc-rig-unwrap.png) is a blank clothing template for the default limbs found in `cc/rig.luau` (torso, left arm, left leg, right arm, right leg) \
-[extras/cc-demo-scripts.rbxm](extras/cc-demo-scripts.rbxm) is a standalone rbxm file containing cc and the demo scripts as an import solution for devs that don't use rojo
-
-## demo game
-
-[https://www.roblox.com/games/104949334668691/cc-demo](https://www.roblox.com/games/104949334668691/cc-demo)
+rendered: [setup.md](setup.md)
 
 ---
 
-ㅍ cc by 00826 / overflowed
+ㅍ cc by 00826

@@ -33,21 +33,6 @@ local rig = {
 		TwistUpperAngle = 25;
 	};
 
-	angleflag = "rig_angle";
-	maxvelocityflag = "rig_maxvelocity";
-
-	swaptabler6 = {
-		["HumanoidRootPart"] = "RootPart";
-		["Head"] = "Head";
-		["Torso"] = "Torso";
-		["Right Arm"] = "RightArm";
-		["Left Arm"] = "LeftArm";
-		["Right Hand"] = "RightHand";
-		["Left Hand"] = "LeftHand";
-		["Right Leg"] = "RightLeg";
-		["Left Leg"] = "LeftLeg";
-	};
-
 	boytorso = "rbxassetid://17580060252";
 	girltorso = "rbxassetid://70841440477204";
 }
@@ -298,144 +283,12 @@ function rig.setactiveconstraints(r: typeof(rig.create(...)), limbmap: {[string]
 	end
 end
 
---- solves motor6d.desiredangle
-function rig.solveanimationconstraintdesiredangle(motor: AnimationConstraint, desiredangle: number)
-	local currentangle = (motor:GetAttribute(rig.angleflag) or 0) :: number
-	local maxvelocity = (motor:GetAttribute(rig.maxvelocityflag) or 0) :: number
-
-	if desiredangle > currentangle then
-		currentangle += maxvelocity * 1
-		if currentangle > desiredangle then
-			currentangle = desiredangle
-		end
-	elseif desiredangle < currentangle then
-		currentangle += maxvelocity * -1
-		if currentangle < desiredangle then
-			currentangle = desiredangle
-		end
-	else
-		currentangle = desiredangle
-	end
-
-	motor:SetAttribute(rig.angleflag, currentangle)
-	return currentangle
-end
-
 --- resets motor transforms \
 --- call before playing a non-procedural animation
 function rig.resetanimationconstrainttransforms(r: typeof(rig.create(...)))
 	for _, animationconstraint in r:QueryDescendants("AnimationConstraint") do
 		assert(animationconstraint:IsA("AnimationConstraint"))
 		animationconstraint.Transform = CFrame.identity
-	end
-end
-
---- advances rig animation constraint transforms wrt elapsed time
-function rig.stepanimationconstraints(
-	r: typeof(rig.create(...)),
-	state: "idle" | "walk" | "fall" | "seat" | "fly",
-	crouched: boolean,
-	toolpose: "none" | "left" | "right" | "both",
-	elapsed: number,
-	freq: number?
-)
-	local root = r:FindFirstChild("RootPart") :: BasePart
-	local rootjoint = root:FindFirstChild("RootJoint") :: AnimationConstraint
-
-	local torso = r:FindFirstChild("Torso") :: BasePart
-	local neck = torso:FindFirstChild("Neck") :: AnimationConstraint
-	local rightshoulder = torso:FindFirstChild("RightShoulder") :: AnimationConstraint
-	local righthip = torso:FindFirstChild("RightHip") :: AnimationConstraint
-	local leftshoulder = torso:FindFirstChild("LeftShoulder") :: AnimationConstraint
-	local lefthip = torso:FindFirstChild("LeftHip") :: AnimationConstraint
-
-	if (not neck)
-	or (not rightshoulder)
-	or (not righthip)
-	or (not leftshoulder)
-	or (not lefthip)
-	then
-		return
-	end
-
-	if state == "seat" then
-		rightshoulder:SetAttribute(rig.maxvelocityflag, 0.15)
-		leftshoulder:SetAttribute(rig.maxvelocityflag, 0.15)
-		--- rightshoulder.DesiredAngle = math.pi/2
-		--- leftshoulder.DesiredAngle = -math.pi/2
-		--- righthip.DesiredAngle = math.pi/2
-		--- lefthip.DesiredAngle = -math.pi/2
-		rightshoulder.Transform = CFrame.fromOrientation(0, 0, math.pi/2)
-		leftshoulder.Transform = CFrame.fromOrientation(0, 0, -math.pi/2)
-		righthip.Transform = CFrame.fromOrientation(0, 0, math.pi/2)
-		lefthip.Transform = CFrame.fromOrientation(0, 0, -math.pi/2)
-
-		return
-	end
-	
-	local addhipangle = 0
-
-	if (crouched)
-	then
-		neck:SetAttribute(rig.maxvelocityflag, 0.5)
-		rootjoint:SetAttribute(rig.maxvelocityflag, 0.5)
-		addhipangle = math.pi/4
-		neck.Transform = CFrame.fromOrientation(rig.solveanimationconstraintdesiredangle(neck, -math.pi/4), 0, 0)
-		rootjoint.Transform = CFrame.new(0, 0, -0.25) * CFrame.fromOrientation(rig.solveanimationconstraintdesiredangle(rootjoint, math.pi/4), 0, 0)
-	else
-		neck:SetAttribute(rig.maxvelocityflag, 0.5)
-		rootjoint:SetAttribute(rig.maxvelocityflag, 0.5)
-		addhipangle = 0
-		neck.Transform = CFrame.fromOrientation(rig.solveanimationconstraintdesiredangle(neck, 0), 0, 0)
-		rootjoint.Transform = CFrame.fromOrientation(rig.solveanimationconstraintdesiredangle(rootjoint, 0), 0, 0)
-	end
-  
-	if (state == "fall") then
-		rightshoulder:SetAttribute(rig.maxvelocityflag, 0.5)
-		leftshoulder:SetAttribute(rig.maxvelocityflag, 0.5)
-
-		if (crouched) then
-			local approxangle = 0.1 * math.sin(elapsed * 1)
-			rightshoulder.Transform = CFrame.fromOrientation(0, 0, approxangle)
-			leftshoulder.Transform = CFrame.fromOrientation(0, 0, approxangle)
-		else
-			rightshoulder.Transform = CFrame.fromOrientation(0, 0, math.pi)
-			leftshoulder.Transform = CFrame.fromOrientation(0, 0, -math.pi)
-		end
-		righthip.Transform = CFrame.fromOrientation(0, 0, addhipangle)
-		lefthip.Transform = CFrame.fromOrientation(0, 0, -addhipangle)
-
-		return
-	end
-
-	local amplitude, frequency
-	
-	if state == "idle" then
-		amplitude = 0.1
-		frequency = 1
-	else
-		rightshoulder:SetAttribute(rig.maxvelocityflag, 0.15)
-		leftshoulder:SetAttribute(rig.maxvelocityflag, 0.15)
-		amplitude = 1 * (crouched and 0.5 or 1)
-		frequency = (freq and freq or 9) * (crouched and 0.5 or 1) --- [6, 9, 12]
-	end
-
-	local desiredangle = amplitude * math.sin(elapsed * frequency)
-
-	rightshoulder.Transform = CFrame.fromOrientation(0, 0, desiredangle)
-	leftshoulder.Transform = CFrame.fromOrientation(0, 0, desiredangle)
-	righthip.Transform = CFrame.fromOrientation(0, 0, -(desiredangle - addhipangle))
-	lefthip.Transform = CFrame.fromOrientation(0, 0, -(desiredangle + addhipangle))
-
-	if toolpose == "none" then
-
-	elseif toolpose == "right" then
-		rightshoulder.Transform = CFrame.fromOrientation(0, 0, math.pi/2)
-	elseif toolpose == "left" then
-		leftshoulder.Transform = CFrame.fromOrientation(0, 0, -math.pi/2)
-	elseif toolpose == "both" then
-		rightshoulder.Transform = CFrame.fromOrientation(0, 0, math.pi/2)
-		leftshoulder.Transform = CFrame.fromOrientation(0, 0, -math.pi/2)
 	end
 end
 
