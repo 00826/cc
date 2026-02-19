@@ -19,7 +19,8 @@
 			"$className": "ServerScriptService",
 			"$ignoreUnknownInstances": true,
 			
-			"server": {"$path": "demo/server.server.luau"}
+			"server": {"$path": "demo/server.server.luau"},
+			"killplayermodule": {"$path": "demo/killplayermodule.server.luau"}
 		},
 		"StarterPlayer": {
 			"$className": "StarterPlayer",
