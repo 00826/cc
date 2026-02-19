@@ -12,7 +12,37 @@ local interpolation = {
 	maxframe = 0;
 	--- breakpoints set by `interpolation.breakpointset()`
 	breakpoints = {} :: {{ distance: number, interpolate: boolean, frame: number }};
+
+	--- interpolation target pivot motor6d part0
+	targetmotorpart0 = workspace.Terrain;
+	--- table of interpolation targets \
+	--- keyed by `tostring(userid)`
+	targets = {} :: {[string]: { character: Model, motor: Motor6D }};
 }
+
+--- creates an interpolation target with a `Motor6D` for applying transforms (`character:PivotTo()`)
+function interpolation.createtarget(character: Model)
+	local motor6d = Instance.new("Motor6D")
+	motor6d.Name = "PivotMotor"
+	motor6d.Part0 = interpolation.targetmotorpart0
+	motor6d.Part1 = character.PrimaryPart
+	motor6d.Parent = character.PrimaryPart
+
+	return {
+		character = character;
+		motor = motor6d;
+	}
+end
+
+--- destroys `t.character` and calls `table.clear(t)`
+function interpolation.targetdestroy(key: keyof<typeof(interpolation.targets)>)
+	local t = interpolation.targets[key]
+	if t then
+		t.character:Destroy()
+		table.clear(t)
+		interpolation.targets[key] = nil
+	end
+end
 
 --- creates an interpolation breakpoint instruction \
 --- `number distance:` distance when this breakpoint will be applied \

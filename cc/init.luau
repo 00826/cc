@@ -137,7 +137,7 @@ local cc = {
 }
 
 --- creates new character
-function cc.create()
+function cc.create(bodymovers: boolean?)
 	local character = Instance.new("Model")
 	--- sphere & associated attachment
 	local sphere = cc.sphere:Clone()
@@ -238,21 +238,25 @@ function cc.create()
 	end
 
 	do --- movers
-		--- keep upright, rotations are applied directly to the rigjoint motor
-		local input = cc.input
-		local bg = Instance.new("BodyGyro")
-		bg.CFrame = CFrame.identity
-		bg.D = input.bodygyrod
-		bg.MaxTorque = input.bodygyromaxtorque
-		bg.P = input.bodygyrop
-		bg.Parent = rootpart
+		if bodymovers == true then
+			--- keep upright, rotations are applied directly to the rigjoint motor
+			local input = cc.input
+			local bg = Instance.new("BodyGyro")
+			bg.CFrame = CFrame.identity
+			bg.D = input.bodygyrod
+			bg.MaxTorque = input.bodygyromaxtorque
+			bg.P = input.bodygyrop
+			bg.Parent = rootpart
 
-		--- xyz movement of sphere
-		local bv = Instance.new("BodyVelocity")
-		bv.Velocity = Vector3.zero
-		bv.MaxForce = input.bodyvelocitymaxforce
-		bv.P = input.bodyvelocityp
-		bv.Parent = rootpart
+			--- xyz movement of sphere
+			local bv = Instance.new("BodyVelocity")
+			bv.Velocity = Vector3.zero
+			bv.MaxForce = input.bodyvelocitymaxforce
+			bv.P = input.bodyvelocityp
+			bv.Parent = rootpart
+		else
+			--- nothing
+		end
 	end
 
 	do --- hitbox

@@ -201,8 +201,6 @@ this process is intentionally not handled interally by cc to give more control o
 
 ---
 
-create a cache to house player-characters, typed as `{[string stringuserid]: typeof(cc.create())}`. userids are converted into strings because using userids as numeric keys would turn the cache into a holed array which is ugly
-
 ```lua
 local Players = game:GetService("Players")
 local localplayer = Players.LocalPlayer
@@ -210,32 +208,21 @@ local localplayer = Players.LocalPlayer
 --- for applying a rig when a cc character is instantiated
 local rig = cc.rig
 local r8limbs = require(script.Parent.r8limbs)
-
---- cache of player-character models
-local playercharacters = {} :: {[string]: typeof(cc.create())}
 ```
 
 function to uncache-and/or-destroy a cc character associated with the passed player
 
 ```lua
 --- removes player-character associated with this player with option to destroy the instance
-local function removeplayercharacter(player: Player, destroy: boolean)
-	local userid = player.UserId
+local function removeplayercharacter(player: Player)
+	local stringuserid = tostring(player.UserId)
 
 	player.Character = nil
-	if destroy == true then
-		local character = playercharacters[tostring(userid)]
-		if character then
-			character:Destroy()
-		end
-	end
-	playercharacters[tostring(userid)] = nil
+	interpolation.targetdestroy(stringuserid)
 end
 
 --- connect removeplayercharacter to playerremoving signal
-Players.PlayerRemoving:Connect(function(player: Player)
-	removeplayercharacter(player, true)
-end)
+Players.PlayerRemoving:Connect(removeplayercharacter)
 ```
 
 function to create a cc character for the passed player
@@ -251,17 +238,24 @@ as an aside, [cc/rig.luau](cc/rig.luau) (and by extension [demo/r8limbs.luau](de
 --- creates a player-character for this player
 local function createplayercharacter(player: Player)
 	local userid = player.UserId
+	local stringuserid = tostring(userid)
+	local islocal = player == localplayer
 	
-	local character = cc.create()
+	local character = cc.create(islocal)
 	assert(character)
 	character.Name = player.Name
 	character.Parent = cc.container
 	player.Character = character
 
 	--- cache and connect function to uncache when destroyed
-	playercharacters[tostring(userid)] = character
+	local preexisting = interpolation.targets[stringuserid]
+	if preexisting then
+		interpolation.targetdestroy(preexisting)
+	end
+	interpolation.targets[stringuserid] = interpolation.createtarget(character)
+
 	character.Destroying:Once(function()
-		removeplayercharacter(player, false)
+		removeplayercharacter(player)
 	end)
 
 	local characterrootpart = character:FindFirstChild("RootPart")
@@ -270,18 +264,16 @@ local function createplayercharacter(player: Player)
 	--- localcharacter case
 	--- set camerasubject
 	--- move to spawnlocation
-	if player == localplayer then
-		characterrootpart.Anchored = false
+	characterrootpart.Anchored = false
+
+	if islocal then
 		local head = character:WaitForChild("Head")
 		camera.CameraSubject = head:IsA("BasePart") and head or nil
 		camera.CameraType = Enum.CameraType.Custom
 
 		cameracontroller.resetcameraangle = true
 
-		--- functionality for a pvinstance:moveto() call
-		--- to move local character to somewhere like a default spawn
-	else
-		characterrootpart.Anchored = true
+		character:MoveTo(spawnpoint())
 	end
 
 	--- create rig and attach
@@ -357,17 +349,19 @@ local function instantiate()
 		local player = Players:GetPlayerByUserId(userid)
 		if player then
 			local islocal = player == localplayer
-			if not playercharacters[tostring(userid)] then
+			if not interpolation.targets[stringuserid] then
 				--- create character if dne
 				createplayercharacter(player)
 			else
-				--- destroy if below fallenpartsdestroyheight
+				--- destroy if below fallenpartsdestroyheight then skip
 				local character = player.Character
 				if character then
 					local pivot = character:GetPivot()
 					local primarypart = character.PrimaryPart
 					if pivot.Y <= workspace.FallenPartsDestroyHeight or primarypart == nil or not primarypart:IsDescendantOf(workspace) then
-						removeplayercharacter(player, true)
+						removeplayercharacter(player)
+
+						continue
 					end
 				end
 			end
@@ -412,19 +406,17 @@ local function interpolate(dt: number)
 				local distancefromfocus = vector.magnitude(position::any - focus::any)
 				local breakpoint = interpolation.breakpointresolve(distancefromfocus)
 
-				--- pivot/lerp replicated character wrt breakpoint frame
+				--- set transform of pivot motor wrt breakpoint
 				if frame % breakpoint.frame == 0 then
-					local character = player.Character
+					local target = interpolation.targets[stringuserid]
+					local motor = target.motor
 
-					if character then
-						local cframe = CFrame.new(position)
-						if breakpoint.interpolate == true then
-							local pivot = character:GetPivot()
+					local cframe = CFrame.new(position)
 
-							character:PivotTo(pivot:Lerp(cframe, t))
-						else
-							character:PivotTo(cframe)
-						end
+					if breakpoint.interpolate == true then
+						motor.Transform = motor.Transform:Lerp(cframe, t)
+					else
+						motor.Transform = cframe
 					end
 				end
 			end

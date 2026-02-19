@@ -352,47 +352,35 @@ local function spawnpoint()
 	return spawnlocations[1] and spawnlocations[1].Position or Vector3.yAxis * 100
 end
 
---- cache of player-character models;
---- because characters are instantiated on the client, (all the server does is emit buffers)
---- player-characters aren't destroyed when a player leaves
---- because, from the perspective of the server, characters don't exist
-
---- `{[string stringuserid]: typeof(cc.create())}`
-local playercharacters = {} :: {[string]: typeof(cc.create())}
-
 --- removes player-character associated with this player with option to destroy the instance
-local function removeplayercharacter(player: Player, destroy: boolean)
+local function removeplayercharacter(player: Player)
 	local stringuserid = tostring(player.UserId)
 
 	player.Character = nil
-	if destroy == true then
-		local character = playercharacters[stringuserid]
-		if character then
-			character:Destroy()
-		end
-	end
-	playercharacters[stringuserid] = nil
+	interpolation.targetdestroy(stringuserid)
 end
 
 --- connect removeplayercharacter to playerremoving signal
-Players.PlayerRemoving:Connect(function(player: Player)
-	removeplayercharacter(player, true)
-end)
+Players.PlayerRemoving:Connect(removeplayercharacter)
 
 --- creates a player-character for this player
 local function createplayercharacter(player: Player)
 	local userid = player.UserId
+	local stringuserid = tostring(userid)
+	local islocal = player == localplayer
 	
-	local character = cc.create()
+	local character = cc.create(islocal)
 	assert(character)
 	character.Name = player.Name
 	character.Parent = cc.container
 	player.Character = character
 
 	--- cache and connect function to uncache when destroyed
-	playercharacters[tostring(userid)] = character
+	interpolation.targetdestroy(stringuserid)
+	interpolation.targets[stringuserid] = interpolation.createtarget(character)
+
 	character.Destroying:Once(function()
-		removeplayercharacter(player, false)
+		removeplayercharacter(player)
 	end)
 
 	local characterrootpart = character:FindFirstChild("RootPart")
@@ -401,8 +389,9 @@ local function createplayercharacter(player: Player)
 	--- localcharacter case
 	--- set camerasubject
 	--- move to spawnlocation
-	if player == localplayer then
-		characterrootpart.Anchored = false
+	characterrootpart.Anchored = false
+
+	if islocal then
 		local head = character:WaitForChild("Head")
 		camera.CameraSubject = head:IsA("BasePart") and head or nil
 		camera.CameraType = Enum.CameraType.Custom
@@ -410,8 +399,6 @@ local function createplayercharacter(player: Player)
 		cameracontroller.resetcameraangle = true
 
 		character:MoveTo(spawnpoint())
-	else
-		characterrootpart.Anchored = true
 	end
 
 	--- create rig and attach
@@ -450,11 +437,12 @@ local function instantiateandreplicate(dt: number)
 	--- pivot character to resync buffer position
 	for _, resync in resynccache do
 		local userid = replication.resyncreaduserid(resync)
+		local stringuserid = tostring(userid)
 		local player = Players:GetPlayerByUserId(userid)
 		if player then
 			local islocal = player == localplayer
-			--- create character if dne
-			if not playercharacters[tostring(userid)] then
+			if not interpolation.targets[stringuserid] then
+				--- create character if dne
 				createplayercharacter(player)
 			else
 				--- destroy if below fallenpartsdestroyheight then skip
@@ -480,19 +468,17 @@ local function instantiateandreplicate(dt: number)
 				local distancefromfocus = vector.magnitude(position::any - focus::any)
 				local breakpoint = interpolation.breakpointresolve(distancefromfocus)
 
-				--- pivot/lerp replicated character wrt breakpoint frame
+				--- set transform of pivot motor wrt breakpoint
 				if frame % breakpoint.frame == 0 then
-					local character = player.Character
+					local target = interpolation.targets[stringuserid]
+					local motor = target.motor
 
-					if character then
-						local cframe = CFrame.new(position)
-						if breakpoint.interpolate == true then
-							local pivot = character:GetPivot()
+					local cframe = CFrame.new(position)
 
-							character:PivotTo(pivot:Lerp(cframe, t))
-						else
-							character:PivotTo(cframe)
-						end
+					if breakpoint.interpolate == true then
+						motor.Transform = motor.Transform:Lerp(cframe, t)
+					else
+						motor.Transform = cframe
 					end
 				end
 			end
@@ -544,7 +530,10 @@ local function stepanimationconstraints(
 	crouched: boolean,
 	toolpose: "none" | "left" | "right" | "both",
 	elapsed: number,
-	freq: number?
+	freq: number,
+	rotationy: number,
+	rotationx: number,
+	straferotation: number
 )
 	local root = r:FindFirstChild("RootPart") :: BasePart
 	local rootjoint = root:FindFirstChild("RootJoint") :: AnimationConstraint
@@ -587,14 +576,14 @@ local function stepanimationconstraints(
 		neck:SetAttribute(maxvelocityflag, 0.5)
 		rootjoint:SetAttribute(maxvelocityflag, 0.5)
 		addhipangle = math.pi/4
-		neck.Transform = CFrame.fromOrientation(solveanimationconstraintdesiredangle(neck, -math.pi/4), 0, 0)
-		rootjoint.Transform = CFrame.new(0, 0, -0.25) * CFrame.fromOrientation(solveanimationconstraintdesiredangle(rootjoint, math.pi/4), 0, 0)
+		neck.Transform = CFrame.fromOrientation(solveanimationconstraintdesiredangle(neck, -math.pi/4), 0, 0) * CFrame.fromOrientation(0, 0, straferotation) * CFrame.fromOrientation(rotationx, 0, 0)
+		rootjoint.Transform = CFrame.fromOrientation(0, 0, rotationy - straferotation) * CFrame.new(0, 0, -0.25) * CFrame.fromOrientation(solveanimationconstraintdesiredangle(rootjoint, math.pi/4), 0, 0)
 	else
 		neck:SetAttribute(maxvelocityflag, 0.5)
 		rootjoint:SetAttribute(maxvelocityflag, 0.5)
 		addhipangle = 0
-		neck.Transform = CFrame.fromOrientation(solveanimationconstraintdesiredangle(neck, 0), 0, 0)
-		rootjoint.Transform = CFrame.fromOrientation(solveanimationconstraintdesiredangle(rootjoint, 0), 0, 0)
+		neck.Transform =  CFrame.fromOrientation(solveanimationconstraintdesiredangle(neck, 0), 0, 0) * CFrame.fromOrientation(0, 0, straferotation) * CFrame.fromOrientation(rotationx, 0, 0)
+		rootjoint.Transform = CFrame.fromOrientation(0, 0, rotationy - straferotation) * CFrame.fromOrientation(solveanimationconstraintdesiredangle(rootjoint, 0), 0, 0)
 	end
   
 	if (state == "fall") then
@@ -624,7 +613,7 @@ local function stepanimationconstraints(
 		rightshoulder:SetAttribute(maxvelocityflag, 0.15)
 		leftshoulder:SetAttribute(maxvelocityflag, 0.15)
 		amplitude = 1 * (crouched and 0.5 or 1)
-		frequency = (freq and freq or 9) * (crouched and 0.5 or 1) --- [6, 9, 12]
+		frequency = freq * (crouched and 0.5 or 1) --- [6, 9, 12]
 	end
 
 	local desiredangle = amplitude * math.sin(elapsed * frequency)
@@ -649,12 +638,12 @@ end
 local framerate = 1/24
 local elapsed = 0
 local function animate(dt: number)
-	elapsed += dt
-	local animatethisframe = false
-	if elapsed > framerate then
-		elapsed = 0
-		animatethisframe = true
-	end
+	--- elapsed += dt
+	--- local animatethisframe = false
+	--- if elapsed > framerate then
+	--- 	elapsed = 0
+	--- 	animatethisframe = true
+	--- end
 
 	--- interpolation.i(dt)
 	local i = 1 - (10e-8 ^ dt)
@@ -709,35 +698,35 @@ local function animate(dt: number)
 		for _, attachment in ipairs(character:QueryDescendants("Attachment")) do
 			assert(attachment:IsA("Attachment"))
 			if attachment.Name == "NeckAttachment1" then
-				attachment.CFrame = CFrame.new(0, -0.5, 0) * CFrame.Angles(-math.pi/2, 0, math.pi) * CFrame.Angles(rx, 0, -xreal)
-			elseif attachment.Name == "RootAttachment" then
-				attachment.CFrame = CFrame.fromOrientation(0, -ry + xreal, 0)
+				--- attachment.CFrame = CFrame.new(0, -0.5, 0) * CFrame.Angles(-math.pi/2, 0, math.pi) * CFrame.Angles(rx, 0, -xreal)
 			end
 		end
 
 		--- procedural animationconstraint animation wrt elapsed (os.clock())
-		if animatethisframe then
-			local statestring = replication.statetostring(replication.readstate(resync::buffer))
-			if statestring == "fly" then
-				if ix == 0 and iz == 0 then
-					statestring = "idle"
-				else
-					statestring = "walk"
-				end
+		local statestring = replication.statetostring(replication.readstate(resync::buffer))
+		if statestring == "fly" then
+			if ix == 0 and iz == 0 then
+				statestring = "idle"
+			else
+				statestring = "walk"
 			end
-
-			task.defer(
-				stepanimationconstraints,
-				playerrig,
-				statestring::any,
-				iy == 2 or iy == 3 or false,
-				"none"::any,
-				os.clock()
-			)
 		end
+
+		task.defer(
+			stepanimationconstraints,
+			playerrig,
+			statestring::any,
+			iy == 2 or iy == 3 or false,
+			"none"::any,
+			os.clock(),
+			9,
+			ry,
+			-rx,
+			xreal
+		)
 	end
 end
 
-RunService.Heartbeat:Connect(animate)
+RunService.PreSimulation:Connect(animate)
 
 return true
