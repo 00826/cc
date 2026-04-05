@@ -1,5 +1,3 @@
---!strict
-
 --- ### r8limbs.luau
 ---
 --- cc rig limb config for r6+2 rig
@@ -15,6 +13,8 @@ return {
 
 		size = Vector3.new(2, 2, 1);
 		transparency = 1;
+		canquery = false;
+		collisiongroup = "Default";
 
 		attachments = {
 			RootAttachment = CFrame.new(0, 0, 0);
@@ -22,7 +22,10 @@ return {
 			RootJointAttachment0 = CFrame.new() * CFrame.fromOrientation(-math.pi/2, -math.pi, 0);
 		};
 		animationconstraints = {
-			RootJoint = { attachment0 = "RootJointAttachment0"; attachment1 = "RootJointAttachment1"; iskinematic = true; };
+			--- RootJoint = { attachment0 = "RootJointAttachment0"; attachment1 = "RootJointAttachment1"; iskinematic = true; };
+		};
+		motor6ds = {
+			RootJoint = { part1 = "Torso"; c0 = CFrame.fromOrientation(-math.pi/2, math.pi, 0); c1 = CFrame.fromOrientation(-math.pi/2, math.pi, 0); maxvelocity = 0.2; };
 		};
 		ballsocketconstraints = {
 			
@@ -41,6 +44,8 @@ return {
 
 		size = Vector3.new(1, 1, 1);
 		transparency = 0;
+		canquery = false;
+		collisiongroup = "Default";
 
 		attachments = {
 			FaceCenterAttachment = CFrame.new(0, 0, 0);
@@ -48,10 +53,13 @@ return {
 			HairAttachment = CFrame.new(0, 0.6, 0);
 			HatAttachment = CFrame.new(0, 0.6, 0);
 
-			NeckAttachment1 = CFrame.new(0, -0.5, 0) * CFrame.fromOrientation(-math.pi/2, -math.pi, 0);
+			--- NeckAttachment1 = CFrame.new(0, -0.5, 0) * CFrame.fromOrientation(-math.pi/2, -math.pi, 0);
 		};
 		animationconstraints = {
 			
+		};
+		motor6ds = {
+
 		};
 		ballsocketconstraints = {
 			
@@ -69,6 +77,8 @@ return {
 
 		size = Vector3.new(2, 2, 1);
 		transparency = 0;
+		canquery = false;
+		collisiongroup = "Default";
 
 		attachments = {
 			BodyBackAttachment = CFrame.new(0, 0, 0.5);
@@ -89,11 +99,18 @@ return {
 			RightShoulderAttachment0 = CFrame.new(1, 0.5, 0) * CFrame.fromOrientation(0, math.pi/2, 0);
 		};
 		animationconstraints = {
-			LeftHip = { attachment0 = "LeftHipAttachment0"; attachment1 = "LeftHipAttachment1"; iskinematic = true; };
-			LeftShoulder = { attachment0 = "LeftShoulderAttachment0"; attachment1 = "LeftShoulderAttachment1"; iskinematic = true; };
-			Neck = { attachment0 = "NeckAttachment0"; attachment1 = "NeckAttachment1"; iskinematic = true; };
-			RightHip = { attachment0 = "RightHipAttachment0"; attachment1 = "RightHipAttachment1"; iskinematic = true; };
-			RightShoulder = { attachment0 = "RightShoulderAttachment0"; attachment1 = "RightShoulderAttachment1"; iskinematic = true; };
+			--- LeftHip = { attachment0 = "LeftHipAttachment0"; attachment1 = "LeftHipAttachment1"; iskinematic = true; };
+			--- LeftShoulder = { attachment0 = "LeftShoulderAttachment0"; attachment1 = "LeftShoulderAttachment1"; iskinematic = true; };
+			--- Neck = { attachment0 = "NeckAttachment0"; attachment1 = "NeckAttachment1"; iskinematic = true; };
+			--- RightHip = { attachment0 = "RightHipAttachment0"; attachment1 = "RightHipAttachment1"; iskinematic = true; };
+			--- RightShoulder = { attachment0 = "RightShoulderAttachment0"; attachment1 = "RightShoulderAttachment1"; iskinematic = true; };
+		};
+		motor6ds = {
+			LeftHip = { part1 = "LeftLeg"; c0 = CFrame.new(-1, -1, 0) * CFrame.fromOrientation(0, -math.pi/2, 0); c1 = CFrame.new(-0.5, 1, 0) * CFrame.fromOrientation(0, -math.pi/2, 0); maxvelocity = 0.2; };
+			LeftShoulder = { part1 = "LeftArm"; c0 = CFrame.new(-1, 0.5, 0) * CFrame.fromOrientation(0, -math.pi/2, 0); c1 = CFrame.new(0.5, 0.5, 0) * CFrame.fromOrientation(0, -math.pi/2, 0); maxvelocity = 0.2; };
+			Neck = { part1 = "Head"; c0 = CFrame.new(0, 1, 0) * CFrame.fromOrientation(-math.pi/2, math.pi, 0); c1 = CFrame.new(0, -0.5, 0) * CFrame.fromOrientation(-math.pi/2, math.pi, 0); maxvelocity = 0.2; };
+			RightHip = { part1 = "RightLeg"; c0 = CFrame.new(1, -1, 0) * CFrame.fromOrientation(0, math.pi/2, 0); c1 = CFrame.new(0.5, 1, 0) * CFrame.fromOrientation(0, math.pi/2, 0); maxvelocity = 0.2; };
+			RightShoulder = { part1 = "RightArm"; c0 = CFrame.new(1, 0.5, 0) * CFrame.fromOrientation(0, math.pi/2, 0); c1 = CFrame.new(-0.5, 0.5, 0) * CFrame.fromOrientation(0, math.pi/2, 0); maxvelocity = 0.2; };
 		};
 		ballsocketconstraints = {
 			LeftHip = { attachment0 = "LeftHipAttachment0"; attachment1 = "LeftHipAttachment1"; };
@@ -115,6 +132,8 @@ return {
 
 		size = Vector3.new(1, 2, 1);
 		transparency = 0;
+		canquery = false;
+		collisiongroup = "Default";
 
 		attachments = {
 			LeftGripAttachment = CFrame.new(0, -1, 0);
@@ -125,7 +144,10 @@ return {
 			LeftWristAttachment0 = CFrame.new(0, -1, 0) * CFrame.fromOrientation(-math.pi/2, 0, 0);
 		};
 		animationconstraints = {
-			LeftWrist = { attachment0 = "LeftWristAttachment0"; attachment1 = "LeftWristAttachment1"; iskinematic = true; };
+			--- LeftWrist = { attachment0 = "LeftWristAttachment0"; attachment1 = "LeftWristAttachment1"; iskinematic = true; };
+		};
+		motor6ds = {
+			LeftWrist = { part1 = "LeftHand"; c0 = CFrame.new(0, -1, 0) * CFrame.fromOrientation(-math.pi/2, 0, 0); c1 = CFrame.new(0, 0, 0) * CFrame.fromOrientation(0, 0, 0); maxvelocity = 0.2; };
 		};
 		ballsocketconstraints = {
 			
@@ -142,6 +164,8 @@ return {
 
 		size = Vector3.new(1, 1, 1);
 		transparency = 1;
+		canquery = false;
+		collisiongroup = "Default";
 
 		attachments = {
 			LeftHandAttachment = CFrame.new(0, 0, 0);
@@ -150,6 +174,9 @@ return {
 		};
 		animationconstraints = {
 			
+		};
+		motor6ds = {
+
 		};
 		ballsocketconstraints = {
 			
@@ -166,6 +193,8 @@ return {
 
 		size = Vector3.new(1, 2, 1);
 		transparency = 0;
+		canquery = false;
+		collisiongroup = "Default";
 
 		attachments = {
 			LeftFootAttachment = CFrame.new(0, -1, 0);
@@ -174,6 +203,9 @@ return {
 		};
 		animationconstraints = {
 			
+		};
+		motor6ds = {
+
 		};
 		ballsocketconstraints = {
 			
@@ -185,6 +217,8 @@ return {
 		meshid = "rbxassetid://17580118235";
 		scale = Vector3.new(1, 1, 1);
 		hasface = false;
+		canquery = false;
+		collisiongroup = "Default";
 
 		humanoiddescriptionclothingproperties = { "Shirt" };
 		humanoiddescriptioncolorproperty = "RightArmColor";
@@ -201,13 +235,13 @@ return {
 			RightWristAttachment0 = CFrame.new(0, -1, 0) * CFrame.fromOrientation(-math.pi/2, 0, 0);
 		};
 		animationconstraints = {
-			RightWrist = { attachment0 = "RightWristAttachment0"; attachment1 = "RightWristAttachment1"; iskinematic = true; };
+			--- RightWrist = { attachment0 = "RightWristAttachment0"; attachment1 = "RightWristAttachment1"; iskinematic = true; };
+		};
+		motor6ds = {
+			RightWrist = { part1 = "RightHand"; c0 = CFrame.new(0, -1, 0) * CFrame.fromOrientation(-math.pi/2, 0, 0); c1 = CFrame.new(0, 0, 0) * CFrame.fromOrientation(0, 0, 0); maxvelocity = 0.2; };
 		};
 		ballsocketconstraints = {
 			
-		};
-		motors = {
-
 		};
 		ragdollcollision = true;
 	};
@@ -221,6 +255,8 @@ return {
 
 		size = Vector3.new(1, 1, 1);
 		transparency = 1;
+		canquery = false;
+		collisiongroup = "Default";
 
 		attachments = {
 			RightHandAttachment = CFrame.new(0, 0, 0);
@@ -229,6 +265,9 @@ return {
 		};
 		animationconstraints = {
 			
+		};
+		motor6ds = {
+
 		};
 		ballsocketconstraints = {
 			
@@ -245,6 +284,8 @@ return {
 
 		size = Vector3.new(1, 2, 1);
 		transparency = 0;
+		canquery = false;
+		collisiongroup = "Default";
 
 		attachments = {
 			RightFootAttachment = CFrame.new(0, -1, 0);
@@ -253,6 +294,9 @@ return {
 		};
 		animationconstraints = {
 			
+		};
+		motor6ds = {
+
 		};
 		ballsocketconstraints = {
 			

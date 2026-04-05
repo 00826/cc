@@ -7,7 +7,8 @@
 			"$ignoreUnknownInstances": true,
 			
 			"client": {"$path": "demo/client.client.luau"},
-			"r8limbs": {"$path": "demo/r8limbs.luau"}
+			"r8limbs": {"$path": "demo/r8limbs.luau"},
+			"stepmotors": {"$path": "demo/stepmotors.luau"}
 		},
 		"ReplicatedStorage": {
 			"$className": "ReplicatedStorage",
@@ -19,8 +20,7 @@
 			"$className": "ServerScriptService",
 			"$ignoreUnknownInstances": true,
 			
-			"server": {"$path": "demo/server.server.luau"},
-			"killplayermodule": {"$path": "demo/killplayermodule.server.luau"}
+			"server": {"$path": "demo/server.server.luau"}
 		},
 		"StarterPlayer": {
 			"$className": "StarterPlayer",

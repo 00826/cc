@@ -12,15 +12,13 @@ local UserInputService = game:GetService("UserInputService")
 local replicatedstorage = game:GetService("ReplicatedStorage")
 local cc = require(replicatedstorage:WaitForChild("cc"))
 local r8limbs = require(script.Parent:WaitForChild("r8limbs"))
+local stepmotors = require(script.Parent:WaitForChild("stepmotors"))
 
 local cameracontroller = cc.cameracontroller
 local inputcontroller = cc.inputcontroller
 local interpolation = cc.interpolation
 local replication = cc.replication
 local rig = cc.rig
-local viewport = cc.viewport
-
-assert(cameracontroller and inputcontroller and rig and viewport) --- type solver
 
 local ccinput = cc.input
 local ccoutput = cc.output
@@ -47,7 +45,7 @@ ccinput.floorcastextend = 1/8
 ccinput.radiusextend = -1/8
 
 --- set cameracontroller zoom behavior
-cameracontroller.zoombehavior = "snap"
+cameracontroller.zoombehavior = "step"
 
 --- set cameracontroller touch device pan use raw (non-curved) input
 --- for responsiveness
@@ -289,9 +287,10 @@ local function step(dt: number)
 	local movevector = inputcontroller.vector
 	replication.writeinput(
 		r,
-		replication.signedtobits(movevector.X),
-		replication.updowntobits(ccinput.inputup, ccinput.inputdown),
-		replication.signedtobits(movevector.Z)
+		movevector.X,
+		ccinput.inputup,
+		ccinput.inputdown,
+		movevector.Z
 	)
 	--- write state
 	replication.writestate(r, ccoutput.state)
@@ -409,13 +408,18 @@ local function createplayercharacter(player: Player)
 
 	local rigroot = newrig:FindFirstChild("RootPart")
 	assert(rigroot and rigroot:IsA("BasePart"))
-	local rootattachment = rigroot:FindFirstChild("RootAttachment")
-	assert(rootattachment and rootattachment:IsA("Attachment"))
 	
 	local rigjoint = characterrootpart:FindFirstChild("RigJoint")
-	assert(rigjoint and rigjoint:IsA("AnimationConstraint"))
+	assert(rigjoint)
 
-	rigjoint.Attachment1 = rootattachment
+	if rigjoint:IsA("AnimationConstraint") then
+		local rootattachment = rigroot:FindFirstChild("RootAttachment")
+		assert(rootattachment and rootattachment:IsA("Attachment"))
+		rigjoint.Attachment1 = rootattachment
+	elseif rigjoint:IsA("Motor6D") then
+		rigjoint.Part1 = rigroot
+	end
+
 
 	return character
 end
@@ -493,158 +497,8 @@ end
 
 RunService.Heartbeat:Connect(instantiateandreplicate)
 
---- basic animation pattern
---- always applies strafing/rotations
---- but limb transforms are set every framerate
-
-local angleflag = "rig_angle"
-local maxvelocityflag = "rig_maxvelocity"
-
---- solves motor6d.desiredangle
-local function solveanimationconstraintdesiredangle(motor: AnimationConstraint, desiredangle: number)
-	local currentangle = (motor:GetAttribute(angleflag) or 0) :: number
-	local maxvelocity = (motor:GetAttribute(maxvelocityflag) or 0) :: number
-
-	if desiredangle > currentangle then
-		currentangle += maxvelocity * 1
-		if currentangle > desiredangle then
-			currentangle = desiredangle
-		end
-	elseif desiredangle < currentangle then
-		currentangle += maxvelocity * -1
-		if currentangle < desiredangle then
-			currentangle = desiredangle
-		end
-	else
-		currentangle = desiredangle
-	end
-
-	motor:SetAttribute(angleflag, currentangle)
-	return currentangle
-end
-
---- advances rig animation constraint transforms wrt elapsed time
-local function stepanimationconstraints(
-	r: typeof(rig.create(...)),
-	state: "idle" | "walk" | "fall" | "seat" | "fly",
-	crouched: boolean,
-	toolpose: "none" | "left" | "right" | "both",
-	elapsed: number,
-	freq: number,
-	rotationy: number,
-	rotationx: number,
-	straferotation: number
-)
-	local root = r:FindFirstChild("RootPart") :: BasePart
-	local rootjoint = root:FindFirstChild("RootJoint") :: AnimationConstraint
-
-	local torso = r:FindFirstChild("Torso") :: BasePart
-	local neck = torso:FindFirstChild("Neck") :: AnimationConstraint
-	local rightshoulder = torso:FindFirstChild("RightShoulder") :: AnimationConstraint
-	local righthip = torso:FindFirstChild("RightHip") :: AnimationConstraint
-	local leftshoulder = torso:FindFirstChild("LeftShoulder") :: AnimationConstraint
-	local lefthip = torso:FindFirstChild("LeftHip") :: AnimationConstraint
-
-	if (not neck)
-	or (not rightshoulder)
-	or (not righthip)
-	or (not leftshoulder)
-	or (not lefthip)
-	then
-		return
-	end
-
-	if state == "seat" then
-		rightshoulder:SetAttribute(maxvelocityflag, 0.15)
-		leftshoulder:SetAttribute(maxvelocityflag, 0.15)
-		--- rightshoulder.DesiredAngle = math.pi/2
-		--- leftshoulder.DesiredAngle = -math.pi/2
-		--- righthip.DesiredAngle = math.pi/2
-		--- lefthip.DesiredAngle = -math.pi/2
-		rightshoulder.Transform = CFrame.fromOrientation(0, 0, math.pi/2)
-		leftshoulder.Transform = CFrame.fromOrientation(0, 0, -math.pi/2)
-		righthip.Transform = CFrame.fromOrientation(0, 0, math.pi/2)
-		lefthip.Transform = CFrame.fromOrientation(0, 0, -math.pi/2)
-
-		return
-	end
-	
-	local addhipangle = 0
-
-	if (crouched)
-	then
-		neck:SetAttribute(maxvelocityflag, 0.5)
-		rootjoint:SetAttribute(maxvelocityflag, 0.5)
-		addhipangle = math.pi/4
-		neck.Transform = CFrame.fromOrientation(solveanimationconstraintdesiredangle(neck, -math.pi/4), 0, 0) * CFrame.fromOrientation(0, 0, straferotation) * CFrame.fromOrientation(rotationx, 0, 0)
-		rootjoint.Transform = CFrame.fromOrientation(0, 0, rotationy - straferotation) * CFrame.new(0, 0, -0.25) * CFrame.fromOrientation(solveanimationconstraintdesiredangle(rootjoint, math.pi/4), 0, 0)
-	else
-		neck:SetAttribute(maxvelocityflag, 0.5)
-		rootjoint:SetAttribute(maxvelocityflag, 0.5)
-		addhipangle = 0
-		neck.Transform =  CFrame.fromOrientation(solveanimationconstraintdesiredangle(neck, 0), 0, 0) * CFrame.fromOrientation(0, 0, straferotation) * CFrame.fromOrientation(rotationx, 0, 0)
-		rootjoint.Transform = CFrame.fromOrientation(0, 0, rotationy - straferotation) * CFrame.fromOrientation(solveanimationconstraintdesiredangle(rootjoint, 0), 0, 0)
-	end
-  
-	if (state == "fall") then
-		rightshoulder:SetAttribute(maxvelocityflag, 0.5)
-		leftshoulder:SetAttribute(maxvelocityflag, 0.5)
-
-		if (crouched) then
-			local approxangle = 0.1 * math.sin(elapsed * 1)
-			rightshoulder.Transform = CFrame.fromOrientation(0, 0, approxangle)
-			leftshoulder.Transform = CFrame.fromOrientation(0, 0, approxangle)
-		else
-			rightshoulder.Transform = CFrame.fromOrientation(0, 0, math.pi)
-			leftshoulder.Transform = CFrame.fromOrientation(0, 0, -math.pi)
-		end
-		righthip.Transform = CFrame.fromOrientation(0, 0, addhipangle)
-		lefthip.Transform = CFrame.fromOrientation(0, 0, -addhipangle)
-
-		return
-	end
-
-	local amplitude, frequency
-	
-	if state == "idle" then
-		amplitude = 0.1
-		frequency = 1
-	else
-		rightshoulder:SetAttribute(maxvelocityflag, 0.15)
-		leftshoulder:SetAttribute(maxvelocityflag, 0.15)
-		amplitude = 1 * (crouched and 0.5 or 1)
-		frequency = freq * (crouched and 0.5 or 1) --- [6, 9, 12]
-	end
-
-	local desiredangle = amplitude * math.sin(elapsed * frequency)
-
-	rightshoulder.Transform = CFrame.fromOrientation(0, 0, desiredangle)
-	leftshoulder.Transform = CFrame.fromOrientation(0, 0, desiredangle)
-	righthip.Transform = CFrame.fromOrientation(0, 0, -(desiredangle - addhipangle))
-	lefthip.Transform = CFrame.fromOrientation(0, 0, -(desiredangle + addhipangle))
-
-	if toolpose == "none" then
-
-	elseif toolpose == "right" then
-		rightshoulder.Transform = CFrame.fromOrientation(0, 0, math.pi/2)
-	elseif toolpose == "left" then
-		leftshoulder.Transform = CFrame.fromOrientation(0, 0, -math.pi/2)
-	elseif toolpose == "both" then
-		rightshoulder.Transform = CFrame.fromOrientation(0, 0, math.pi/2)
-		leftshoulder.Transform = CFrame.fromOrientation(0, 0, -math.pi/2)
-	end
-end
-
-local framerate = 1/24
-local elapsed = 0
+--- basic animation function
 local function animate(dt: number)
-	--- elapsed += dt
-	--- local animatethisframe = false
-	--- if elapsed > framerate then
-	--- 	elapsed = 0
-	--- 	animatethisframe = true
-	--- end
-
 	--- interpolation.i(dt)
 	local i = 1 - (10e-8 ^ dt)
 
@@ -684,26 +538,50 @@ local function animate(dt: number)
 		if islocal then
 			xsign = inputcontroller.vector.X
 		else
-			xsign = replication.bitstosigned(ix)
+			xsign = ix
 		end
 		xsign = math.map(xsign, -1, 1, -math.pi/4, math.pi/4)
-
-		local xvalue = character:GetAttribute("xvalue")
-		xvalue = type(xvalue) == "number" and xvalue or 0
 		
-		local xreal = math.lerp(xvalue, xsign, i)
-		character:SetAttribute("xvalue", xreal)
+		local ysign
+		if islocal then
+			ysign = inputcontroller.vector.Y
+		else
+			ysign = iy
+		end
+		ysign = math.map(xsign, -1, 1, -math.pi/8, math.pi/8)
+		
+		local zsign
+		if islocal then
+			zsign = inputcontroller.vector.Z
+		else
+			zsign = iz
+		end
+		zsign = math.map(zsign, -1, 1, math.pi/8, -math.pi/8)
 
-		--- set attachment cframes
-		for _, attachment in ipairs(character:QueryDescendants("Attachment")) do
-			assert(attachment:IsA("Attachment"))
-			if attachment.Name == "NeckAttachment1" then
-				--- attachment.CFrame = CFrame.new(0, -0.5, 0) * CFrame.Angles(-math.pi/2, 0, math.pi) * CFrame.Angles(rx, 0, -xreal)
-			end
+		local statestring = replication.statetostring(replication.readstate(resync))::any
+
+		if statestring == "fall" then
+			xsign = 0
+		else
+			ysign = 0
+			zsign = 0
 		end
 
+		local xvalue = character:GetAttribute("xvalue") or 0
+		local xreal = math.lerp(xvalue::any, xsign, i)
+		character:SetAttribute("xvalue", xreal)
+
+		local yvalue = character:GetAttribute("yvalue") or 0
+		local yreal = math.lerp(yvalue::any, ysign, i)
+		character:SetAttribute("yvalue", yreal)
+
+		local zvalue = character:GetAttribute("zvalue") or 0
+		local zreal = math.lerp(zvalue::any, zsign, i)
+		character:SetAttribute("zvalue", zreal)
+
+		local iscrouched = iy == 2 or iy == 3 or false
+
 		--- procedural animationconstraint animation wrt elapsed (os.clock())
-		local statestring = replication.statetostring(replication.readstate(resync::buffer))
 		if statestring == "fly" then
 			if ix == 0 and iz == 0 then
 				statestring = "idle"
@@ -712,17 +590,18 @@ local function animate(dt: number)
 			end
 		end
 
-		task.defer(
-			stepanimationconstraints,
+		stepmotors(
 			playerrig,
 			statestring::any,
-			iy == 2 or iy == 3 or false,
+			iscrouched,
 			"none"::any,
 			os.clock(),
 			9,
 			ry,
 			-rx,
-			xreal
+			xreal,
+			yreal,
+			zreal
 		)
 	end
 end

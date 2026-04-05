@@ -180,9 +180,10 @@ local function step(dt: number)
 	local movevector = inputcontroller.vector
 	replication.writeinput(
 		r,
-		replication.signedtobits(movevector.X),
-		replication.updowntobits(ccinput.inputup, ccinput.inputdown),
-		replication.signedtobits(movevector.Z)
+		movevector.X,
+		ccinput.inputup,
+		ccinput.inputdown,
+		movevector.Z
 	)
 	--- write locomotion state
 	replication.writestate(r, ccoutput.state)

@@ -3,7 +3,7 @@
 local RunService = game:GetService("RunService")
 
 local Players = game:GetService("Players")
-local LocalPlayer = Players.LocalPlayer
+local localplayer = Players.LocalPlayer
 
 local ContextActionService = game:GetService("ContextActionService")
 local UserGameSettings = UserSettings():GetService("UserGameSettings")
@@ -171,7 +171,7 @@ local cameracontroller = {
 	--- input priority
 	inputpriority = Enum.ContextActionPriority.Medium.Value;
 	--- render priority
-	renderpriority = Enum.RenderPriority.Camera.Value - 1;
+	renderpriority = Enum.RenderPriority.Camera.Value;
 
 	--- arrow key camera pan speed in radians/sec \
 	--- ROTATION_SPEED_KEYS
@@ -595,7 +595,7 @@ function cameracontroller.getzoominput()
 end
 
 function cameracontroller.touchguithumbstickframe(): Frame?
-	local playergui = LocalPlayer:FindFirstChildOfClass("PlayerGui")::PlayerGui?
+	local playergui = localplayer:FindFirstChildOfClass("PlayerGui")::PlayerGui?
 	local touchgui = playergui and playergui:FindFirstChild("cc_touchgui")::ScreenGui?
 	local thumbstickframe = touchgui and touchgui:FindFirstChild("ThumbstickFrame")::Frame?
 
@@ -765,8 +765,8 @@ if RunService:IsClient() then
 
 	do
 		--- write player zoom to camera zoom
-		cameracontroller.cameraminzoomdistance = LocalPlayer.CameraMinZoomDistance
-		cameracontroller.cameramaxzoomdistance = LocalPlayer.CameraMaxZoomDistance
+		cameracontroller.cameraminzoomdistance = localplayer.CameraMinZoomDistance
+		cameracontroller.cameramaxzoomdistance = localplayer.CameraMaxZoomDistance
 
 		--- write defaults to distance
 		local mindistance = cameracontroller.cameraminzoomdistance
@@ -775,7 +775,7 @@ if RunService:IsClient() then
 		cameracontroller.currentzoomdistance = defaultzoomdistance
 
 		--- rotate camera
-		cameracontroller.camera.CFrame = CFrame.Angles(math.rad(15), 0, 0)
+		--- cameracontroller.camera.CFrame = CFrame.Angles(math.rad(15), 0, 0)
 
 		--- write defaults to spring
 		local s = cameracontroller.zoomspring
@@ -835,12 +835,12 @@ if RunService:IsClient() then
 	end
 
 	--- min/max zoom distance change
-	LocalPlayer:GetPropertyChangedSignal("CameraMinZoomDistance"):Connect(function()
-		cameracontroller.cameraminzoomdistance = LocalPlayer.CameraMinZoomDistance
+	localplayer:GetPropertyChangedSignal("CameraMinZoomDistance"):Connect(function()
+		cameracontroller.cameraminzoomdistance = localplayer.CameraMinZoomDistance
 		zoomdistancemodified()
 	end)
-	LocalPlayer:GetPropertyChangedSignal("CameraMaxZoomDistance"):Connect(function()
-		cameracontroller.cameramaxzoomdistance = LocalPlayer.CameraMaxZoomDistance
+	localplayer:GetPropertyChangedSignal("CameraMaxZoomDistance"):Connect(function()
+		cameracontroller.cameramaxzoomdistance = localplayer.CameraMaxZoomDistance
 		zoomdistancemodified()
 	end)
 end

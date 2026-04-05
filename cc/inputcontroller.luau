@@ -3,7 +3,7 @@
 local RunService = game:GetService("RunService")
 
 local Players = game:GetService("Players")
-local LocalPlayer = Players.LocalPlayer
+local localplayer = Players.LocalPlayer
 
 local ContextActionService = game:GetService("ContextActionService")
 local GuiService = game:GetService("GuiService")
@@ -413,7 +413,7 @@ function inputcontroller.createvirtualcursor(playergui: PlayerGui)
 	local virtualcursorgui = Instance.new("ScreenGui")
 	virtualcursorgui.Name = "cc_virtualcursorgui"
 	virtualcursorgui.IgnoreGuiInset = true
-	virtualcursorgui.ScreenInsets = Enum.ScreenInsets.DeviceSafeInsets
+	virtualcursorgui.ScreenInsets = Enum.ScreenInsets.None
 	virtualcursorgui.SafeAreaCompatibility = Enum.SafeAreaCompatibility.None
 	virtualcursorgui.ResetOnSpawn = false
 	virtualcursorgui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
@@ -475,7 +475,7 @@ end
 if RunService:IsClient() then
 	do --- resolve touchgui
 		local s, e = pcall(function()
-			local playergui = LocalPlayer:WaitForChild("PlayerGui")
+			local playergui = localplayer:WaitForChild("PlayerGui")
 			assert(playergui:IsA("PlayerGui"), string.format("expected playergui, got %s", playergui.ClassName))
 			local touchgui = inputcontroller.createtouchgui(playergui)
 			
@@ -513,7 +513,7 @@ if RunService:IsClient() then
 	end
 	do --- resolve virtual cursor
 		local s, e = pcall(function()
-			local playergui = LocalPlayer:WaitForChild("PlayerGui")
+			local playergui = localplayer:WaitForChild("PlayerGui")
 			assert(playergui:IsA("PlayerGui"), string.format("expected playergui, got %s", playergui.ClassName))
 			local virtualcursor = inputcontroller.createvirtualcursor(playergui)
 			

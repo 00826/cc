@@ -1,8 +1,5 @@
 --!strict
 
-local RunService = game:GetService("RunService")
-local isserver = RunService:IsServer()
-
 --- returns unit vector from input vector `i`, relative to viewport `lookvector, -upvector`
 @native
 local function movevector(i: Vector3, lookvector: Vector3, upvector: Vector3)
@@ -43,13 +40,13 @@ end
 --- humanoidless player controller and replicator \
 --- [*view cc on github*](https://github.com/00826/cc)
 local cc = {
-	replication = require(script:WaitForChild("replication"));
-	interpolation = require(script:WaitForChild("interpolation"));
+	replication = require(script.replication);
+	interpolation = require(script.interpolation);
 
-	rig = not isserver and require(script:WaitForChild("rig")) or nil;
-	cameracontroller = not isserver and require(script:WaitForChild("cameracontroller")) or nil;
-	inputcontroller = not isserver and require(script:WaitForChild("inputcontroller")) or nil;
-	viewport = not isserver and require(script:WaitForChild("viewport")) or nil;
+	rig = require(script.rig);
+	cameracontroller = require(script.cameracontroller);
+	inputcontroller = require(script.inputcontroller);
+	viewport = require(script.viewport);
 
 	input = {
 		--- empty raycastparams
@@ -116,6 +113,8 @@ local cc = {
 		state = 0;
 		--- world-relative move vector
 		truevector = Vector3.zero;
+		--- speed of cc rootpart
+		speed = 0
 	};
 
 	--- cc character container instance
@@ -132,7 +131,7 @@ local cc = {
 		sphererenderfidenlity = Enum.RenderFidelity.Performance;
 	};
 
-	spheretransparency = 2/3; --- 1
+	spheretransparency = 1; --- 1
 	roottransparency = 1; --- 1
 }
 
@@ -142,13 +141,11 @@ function cc.create(bodymovers: boolean?)
 	--- sphere & associated attachment
 	local sphere = cc.sphere:Clone()
 	sphere.Name = "Sphere"
+	sphere.CastShadow = false
+	sphere.CanQuery = false
 	sphere.Transparency = cc.spheretransparency
 	sphere.Anchored = false
 	sphere.Parent = character
-	local sphereattachment = Instance.new("Attachment")
-	sphereattachment.Name = "SphereAttachment1"
-	sphereattachment.CFrame = CFrame.identity
-	sphereattachment.Parent = sphere
 
 	--- rootpart & associated attachment
 	local rootpart = Instance.new("Part")
@@ -162,10 +159,6 @@ function cc.create(bodymovers: boolean?)
 	rootpart.Massless = false
 	rootpart.Size = Vector3.new(2, 2, 2)
 	rootpart.Parent = character
-	--- local rootattachment = Instance.new("Attachment")
-	--- rootattachment.Name = "RootAttachment1"
-	--- rootattachment.CFrame = CFrame.identity
-	--- rootattachment.Parent = rootpart
 
 	character.PrimaryPart = rootpart
 
@@ -181,10 +174,6 @@ function cc.create(bodymovers: boolean?)
 	head.Massless = true
 	head.Size = Vector3.new(1, 1, 1)
 	head.Parent = character
-	local headattachment = Instance.new("Attachment")
-	headattachment.Name = "HeadAttachment1"
-	headattachment.CFrame = CFrame.identity
-	headattachment.Parent = head
 	
 	do --- top/bottom attachments
 		local ta = Instance.new("Attachment")
@@ -198,43 +187,31 @@ function cc.create(bodymovers: boolean?)
 		ba.Parent = rootpart
 	end
 
-	do --- head animationconstraint
-		local a0 = Instance.new("Attachment")
-		a0.Name = "HeadAttachment0"
-		a0.CFrame = CFrame.new(Vector3.yAxis * 3.5)
-		a0.Parent = rootpart
-		local ac = Instance.new("AnimationConstraint")
-		ac.Name = "HeadJoint"
-		ac.IsKinematic = true
-		ac.Attachment0 = a0
-		ac.Attachment1 = headattachment
-		ac.Parent = rootpart
+	do --- head motor
+		local motor6d = Instance.new("Motor6D")
+		motor6d.Name = "HeadJoint";
+		motor6d.C0 = CFrame.new(0, 3.5, 0)
+		motor6d.Part0 = rootpart
+		motor6d.Part1 = head
+		motor6d.Parent = rootpart
 	end
 
-	do --- rig animationconstraint
-		local a0 = Instance.new("Attachment")
-		a0.Name = "RigAttachment0"
-		a0.CFrame = CFrame.new(Vector3.yAxis * 2)
-		a0.Parent = rootpart
-		local ac = Instance.new("AnimationConstraint")
-		ac.Name = "RigJoint"
-		ac.IsKinematic = true
-		ac.Attachment0 = a0
-		ac.Attachment1 = nil --- empty to be set by developer
-		ac.Parent = rootpart
+	do --- rig motor
+		local motor6d = Instance.new("Motor6D")
+		motor6d.Name = "RigJoint";
+		motor6d.C0 = CFrame.new(0, 2, 0)
+		motor6d.Part0 = rootpart
+		motor6d.Part1 = nil --- to be set by developer
+		motor6d.Parent = rootpart
 	end
 
-	do --- rig animationconstraint
-		local a0 = Instance.new("Attachment")
-		a0.Name = "SphereAttachment0"
-		a0.CFrame = CFrame.new(Vector3.yAxis * 1.55)
-		a0.Parent = rootpart
-		local ac = Instance.new("AnimationConstraint")
-		ac.Name = "SphereJoint"
-		ac.IsKinematic = true
-		ac.Attachment0 = a0
-		ac.Attachment1 = sphereattachment
-		ac.Parent = rootpart
+	do --- sphere motor
+		local motor6d = Instance.new("Motor6D")
+		motor6d.Name = "SphereJoint";
+		motor6d.C0 = CFrame.new(0, 1.55, 0)
+		motor6d.Part0 = rootpart
+		motor6d.Part1 = sphere
+		motor6d.Parent = rootpart
 	end
 
 	do --- movers
@@ -405,6 +382,7 @@ function cc.step(character: typeof(cc.create()))
 	output.floor = floor
 	output.state = state
 	output.truevector = truevector
+	output.speed = vector.magnitude(rootpart.AssemblyLinearVelocity)
 end
 
 return cc

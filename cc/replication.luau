@@ -38,7 +38,7 @@ end
 --- cc replication job & buffer constructors
 local replication = {
 	--- local replication buffer
-	self = buffer.create(12);
+	self = buffer.create(13);
 
 	--- cached resync replication buffers
 	resynccache = table.create(1 + Players.MaxPlayers) :: {buffer};
@@ -68,10 +68,10 @@ local replication = {
 	};
 
 	resyncreplicationoffset = 0;
-	resyncuseridoffset = 12;
-	resynctimeoffset = 20;
+	resyncuseridoffset = 13;
+	resynctimeoffset = 21;
 
-	snapshottimestampoffset = 12;
+	snapshottimestampoffset = 13;
 
 	--- unreliableremoteevent byte limit
 	unreliablebytelimit = 1000;
@@ -80,19 +80,20 @@ local replication = {
 --- creates a replication buffer
 --- ```
 --- key    position x   position y   position z   rotation x  rotation y  input & state
---- bytes  [000]        [000]        [000]        [0]         [0]         [0]
---- range  [0 .. 2]     [3 .. 5]     [6 .. 8]     [9]         [10]        [11]
+--- bytes  [000]        [000]        [000]        [0]         [0]         [00]
+--- range  [0 .. 2]     [3 .. 5]     [6 .. 8]     [9]         [10]        [11 .. 12]
 --- value  [0, 2^23-1]  [0, 2^23-1]  [0, 2^23-1]  [0, 255]    [0, 255]    [...]
 --- ```
 --- input & state bit field
 --- ```
---- key    input x   input y   input z   state
---- bits   [00]      [00]      [00]      [00]
---- range  [0 .. 1]  [2 .. 3]  [4 .. 5]  [6 .. 7]
---- value  [0, 3]    [0, 3]    [0, 3]    [0, 3]
+--- key    input x     input y   input z      state
+--- bits   [000000]    [00]      [000000]    [00]
+--- offset [88+6]      [94+2]    [96+6]      [102+2]
+--- range  [0 .. 5]    [6 .. 7]  [8 .. 13]   [14 .. 15]
+--- value  [0, 2^6-1]  [0, 3]    [0, 2^6-1]  [0, 3]
 --- ```
 function replication.create()
-	return buffer.create(12)
+	return buffer.create(13)
 end
 
 --- writes position to replication buffer
@@ -132,23 +133,19 @@ function replication.readrotation(r: buffer)
 		math.map(buffer.readu8(r, 10), 0, 255, -math.pi, math.pi)
 end
 
---- writes input x,y,z to replication buffer \
---- `0: 0 input` \
---- `1: + input` \
---- `2: - input` \
---- `3: +- input` (only applicable to y)
-function replication.writeinput(r: buffer, x: number, y: number, z: number)
-	buffer.writebits(r, 88, 2, x)
-	buffer.writebits(r, 90, 2, y)
-	buffer.writebits(r, 92, 2, z)
+--- writes input values to replication buffer
+function replication.writeinput(r: buffer, x: number, yup: number, ydown: number, z: number)
+	buffer.writebits(r, 88, 6, math.map(x, -1, 1, 0, 63))
+	buffer.writebits(r, 94, 2, replication.updowntobits(yup, ydown))
+	buffer.writebits(r, 96, 6, math.map(z, -1, 1, 0, 63))
 end
 
---- reads input x,y,z from replication buffer
+--- reads input from replication buffer
 function replication.readinput(r: buffer)
 	return
-		buffer.readbits(r, 88, 2),
-		buffer.readbits(r, 90, 2),
-		buffer.readbits(r, 92, 2)
+		math.map(buffer.readbits(r, 88, 6), 0, 63, -1, 1),
+		buffer.readbits(r, 94, 2),
+		math.map(buffer.readbits(r, 96, 6), 0, 63, -1, 1)
 end
 
 --- writes state to replication buffer \
@@ -157,12 +154,12 @@ end
 --- `2: fall (input vector y > 0)` \
 --- `3: fly (custom state)`
 function replication.writestate(r: buffer, state: number)
-	buffer.writebits(r, 94, 2, state)
+	buffer.writebits(r, 102, 2, state)
 end
 
 --- reads state from replication buffer
 function replication.readstate(r: buffer)
-	return buffer.readbits(r, 94, 2)
+	return buffer.readbits(r, 102, 2)
 end
 
 --- returns zero-indexed state as its equivalent string representation (`replication.states[state + 1]`)
@@ -178,26 +175,6 @@ function replication.statefromstring(s: string)
 	else
 		return 0
 	end
-end
-
---- converts signed integer to unsigned bits \
---- `- -> 2` \
---- `0 -> 0` \
---- `+ -> 1`
-function replication.signedtobits(x: number)
-	return x < 0 and 2
-		or x > 0 and 1
-		or 0
-end
-
---- converts unsigned bits to a signed integer \
---- `2 -> -1` \
---- `1 -> 1` \
---- `0 -> 0`
-function replication.bitstosigned(x: number)
-	return x == 2 and -1
-		or x == 1 and 1
-		or 0
 end
 
 --- converts up/down input to unsigned bits
@@ -229,12 +206,12 @@ end
 --- creates a resync buffer
 --- ```
 --- key    replication buffer  player userid  resync time
---- bytes  [00000000 0000]     [00000000]     [00000000] 
---- range  [0 .. 11]           [12 .. 19]     [20 .. 27] 
+--- bytes  [00000000 00000]    [0000 0000]    [0000 0000] 
+--- range  [0 .. 12]           [13 .. 20]     [21 .. 28] 
 --- value  [...]               [f64]          [f64]      
 --- ```
 function replication.createresyncbuffer()
-	return buffer.create(28) --- replication.resyncreplicationoffset + replication.resyncuseridoffset + replication.resynctimeoffset
+	return buffer.create(29) --- replication.resyncreplicationoffset + replication.resyncuseridoffset + replication.resynctimeoffset
 end
 
 --- writes replication to resync buffer
@@ -419,12 +396,12 @@ end
 --- creates a snapshot buffer
 --- ```
 --- key    replication buffer  timestamp
---- bytes  [00000000 0000]     [00000000]   
---- range  [0 .. 11]           [12 .. 19]   
+--- bytes  [00000000 0000 0]   [00000000]   
+--- range  [0 .. 12]           [13 .. 20]   
 --- value  [...]               [f64]        
 --- ```
 function replication.createsnapshotbuffer(r: buffer?, timestamp: number?)
-	local s = buffer.create(20)
+	local s = buffer.create(21)
 
 	if r then
 		replication.snapshotwritereplication(s, r)

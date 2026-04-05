@@ -49,10 +49,14 @@ function rig.createlimbdescription()
 
 		size = Vector3.one;
 		transparency = 0;
+		canquery = false;
+
+		collisiongroup = "Default";
 
 		attachments = {} :: { [string]: CFrame };
 		animationconstraints = {} :: { [string]: { attachment0: string, attachment1: string, iskinematic: boolean } };
 		ballsocketconstraints = {} :: { [string]: { attachment0: string, attachment1: string } };
+		motor6ds = {} :: { [string]: { part1: string, c0: CFrame, c1: CFrame, maxvelocity: number } };
 
 		ragdollcollision = false;
 	}
@@ -73,6 +77,7 @@ function rig.create(limbmap: {[string]: typeof(rig.createlimbdescription())})
 	local limbs = {}
 	local attachments = {}
 	local animationconstraints = {}
+	local motor6ds = {}
 	local ballsocketconstraints = {}
 
 	for name, entry in limbmap do
@@ -80,11 +85,13 @@ function rig.create(limbmap: {[string]: typeof(rig.createlimbdescription())})
 		limb.Name = name
 
 		--- general limb case
-		limb.CanQuery = false
+		limb.CanQuery = entry.canquery
 		limb.CanTouch = false
 		limb.Anchored = false
 		limb.Massless = true
 		limb.EnableFluidForces = false
+
+		limb.CollisionGroup = entry.collisiongroup
 		
 		limb.Size = entry.size
 		limb.Transparency = entry.transparency
@@ -175,6 +182,18 @@ function rig.create(limbmap: {[string]: typeof(rig.createlimbdescription())})
 
 			ballsocketconstraints[bscname] = ballsocketconstraint
 		end
+		for m6dname, properties in pairs(entry.motor6ds) do
+			local motor6d = Instance.new("Motor6D")
+			motor6d.Name = m6dname
+			motor6d.Part0 = limb
+			motor6d.Parent = limb
+			motor6d.Part1 = limbs[properties.part1]
+			motor6d.C0 = properties.c0
+			motor6d.C1 = properties.c1
+			motor6d.MaxVelocity = properties.maxvelocity
+
+			motor6ds[m6dname] = motor6d
+		end
 	end
 
 	r.PrimaryPart = limbs.RootPart
@@ -234,7 +253,7 @@ function rig.applyclothing(r: typeof(rig.create(...)), limbmap: {[string]: typeo
 end
 
 --- applies meshid to rig limb
-function rig.applybodypartappearance(r: typeof(rig.create(...)), limbmap: {[string]: typeof(rig.createlimbdescription())}, bodypart: string, meshid: string?, color: Color3?, clothingtexture: string?)
+function rig.applybodypartappearance(r: typeof(rig.create(...)), bodypart: string, meshid: string?, color: Color3?, clothingtexture: string?)
 	local limb = r:FindFirstChild(bodypart)
 	if limb and limb:IsA("BasePart") then
 		if meshid then
@@ -290,6 +309,22 @@ function rig.resetanimationconstrainttransforms(r: typeof(rig.create(...)))
 		assert(animationconstraint:IsA("AnimationConstraint"))
 		animationconstraint.Transform = CFrame.identity
 	end
+end
+
+--- returns shallow mapping of limb motor6d transforms
+function rig.readmotor6dtransforms(limbmap: {[string]: typeof(rig.createlimbdescription())})
+	local result = {}
+
+	for name, entry in limbmap do
+		for k, v in entry.motor6ds do
+			result[k] = {
+				c0 = v.c0;
+				c1 = v.c1;
+			}
+		end
+	end
+
+	return result
 end
 
 return rig
