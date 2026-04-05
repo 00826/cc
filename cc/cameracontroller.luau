@@ -5,11 +5,8 @@ local RunService = game:GetService("RunService")
 local Players = game:GetService("Players")
 local localplayer = Players.LocalPlayer
 
-local ContextActionService = game:GetService("ContextActionService")
-local UserGameSettings = UserSettings():GetService("UserGameSettings")
-local UserInputService = game:GetService("UserInputService")
-
-local viewport = require(script.Parent.viewport)
+local inputcontroller = require(script.Parent:WaitForChild("inputcontroller"))
+local viewport = require(script.Parent:WaitForChild("viewport"))
 
 --- creates a spring
 @native
@@ -168,74 +165,12 @@ local cameracontroller = {
 	--- reset camera angle on next step
 	resetcameraangle = true;
 
-	--- input priority
-	inputpriority = Enum.ContextActionPriority.Medium.Value;
 	--- render priority
 	renderpriority = Enum.RenderPriority.Camera.Value;
 
-	--- arrow key camera pan speed in radians/sec \
-	--- ROTATION_SPEED_KEYS
-	arrowkeyspeed = math.rad(120);
-	--- gamepad pan speed in radians/sec \
-	--- ROTATION_SPEED_GAMEPAD
-	gamepadspeed = math.rad(7); --- Vector2.new(1, 0.77) * math.rad(7);
-	--- mouse pan speed in radians/sec
-	--- ROTATION_SPEED_MOUSE
-	mousespeed = math.rad(0.5); --- Vector2.new(1, 0.77)*math.rad(0.5);
-	--- pointer pan speed in radians/sec
-	--- ROTATION_SPEED_POINTERACTION
-	pointerspeed = math.rad(7); --- Vector2.new(1, 0.77)*math.rad(7);
-	--- touch pan speed in radians/sec
-	--- ROTATION_SPEED_TOUCH
-	touchspeed = math.rad(1); --- Vector2.new(1, 0.66)*math.rad(1);
-	--- will touch pan input be modified (curved) by cameracontroller.resolvetouchpitchsensitivity()
-	touchpanuserawinput = false;
-
-	--- (scaled studs/wheel click)
-	--- ZOOM_SPEED_MOUSE
-	mousezoomspeed = 1;
-	--- (studs/s)
-	--- ZOOM_SPEED_KEYS
-	keyzoomspeed = 0.1;
-	--- (scaled studs/DIP %)
-	--- ZOOM_SPEED_TOUCH
-	touchzoomspeed = 0.04;
-
-	--- "...Adjust the touch sensitivity so that sensitivity is reduced when swiping up \
-	--- 25% sensitivity at 90°" \
-	--- MIN_TOUCH_SENSITIVITY_FRACTION
-	touhchsensitivityfraction = 0.25;
-
-	--- gamepad pan deadzone
-	gamepaddeadzone = 0.1;
-
-	--- pan inputs as a single table \
-	--- constructing a vector2 is expensive !! \
-	--- `[1,  2]` gamepad x, y \
-	--- `[3,  4]` keyboard arrow l, r \
-	--- `[5,  6]` mouse delta x, y \
-	--- `[7,  8]` pointer pan delta x, y \
-	--- `[9, 10]` touch pan delta x, y
-	paninputs = table.create(10, 0);
-	--- `[1]` keyboard i
-	--- `[2]` keyboard o
-	--- `[3]` mouse wheel (pointeraction)
-	--- `[4]` mouse pinch (pointeraction)
-	--- `[5]` touch pinch
-	zoominputs = table.create(5, 0);
-
-	gamepadzoomkeycode = Enum.KeyCode.ButtonR3;
+	--- gamepad zoom setting
 	gamepadzoomsteps = 3;
 	currentgamepadzoomstep = 2;
-
-	--- `Enum.UserInputType -> is pan-held` readwrite table
-	paninputmap = {
-		[Enum.UserInputType.MouseButton2] = false;
-		[Enum.UserInputType.Touch] = false;
-	};
-
-	--- boolean describing whether a pan input is being held
-	holdpan = false;
 
 	--- internally-written time elapsed since last step
 	laststep = 0;
@@ -296,7 +231,7 @@ function cameracontroller.step(dt: number)
 
 	--- early exit if scriptable
 	if cameracontroller.cameratype == Enum.CameraType.Scriptable then
-		cameracontroller.reset()
+		inputcontroller.blobreset()
 		return
 	end
 
@@ -322,7 +257,13 @@ function cameracontroller.step(dt: number)
 	end
 
 	--- resolve zoom
-	local zoominput = cameracontroller.getzoominput()
+	--- pop queued gamepad zoom input (default rstick)
+	local pop = inputcontroller.blobpopgamepadzoom()
+	if pop ~= 0 then
+		cameracontroller.gamepadzoomstep(pop)
+	end
+
+	local zoominput = inputcontroller.blobreadzoominput(dt)
 	cameracontroller.stepzoom(zoominput)
 
 	--- resolve spring
@@ -349,7 +290,7 @@ function cameracontroller.step(dt: number)
 	local zoomdistance = springstep(zoomspring, realtime)
 
 	--- resolve rotations
-	local rotateinput = cameracontroller.getrotationinput(realtime)
+	local rotateinput = inputcontroller.blobreadrotationvector(realtime)
 	local camerafocusposition = camerasubjectcframe.Position
 	local newlookvector = cameracontroller.rotatelookvector(cameralookvector, rotateinput)
 
@@ -403,13 +344,14 @@ function cameracontroller.step(dt: number)
 	camera.Focus = realfocus
 
 	--- reset delta-based inputs
-	cameracontroller.resetinputs()
+	inputcontroller.blobresetdeltas()
 
 	cameracontroller.laststep = now
 
 	debug.profileend()
 end
 
+--- advances gamepad zoom step by delta
 function cameracontroller.gamepadzoomstep(delta: number)
 	local maxsteps = cameracontroller.gamepadzoomsteps
 	local currentstep = (cameracontroller.currentgamepadzoomstep + delta) % maxsteps
@@ -491,278 +433,7 @@ function cameracontroller.rotatelookvector(lookvector: Vector3, rotation: Vector
 	return cframe.LookVector
 end
 
---- resets all camera inputs
-function cameracontroller.reset()
-	table.move(table.create(#cameracontroller.paninputs, 0), 1, #cameracontroller.paninputs, 1, cameracontroller.paninputs)
-	local zlen = #cameracontroller.zoominputs - 2
-	table.move(table.create(zlen, 0), 1, zlen, 3, cameracontroller.zoominputs)
-end
-
---- resets delta-based inputs \
---- interally-called at the end of cameracontroller step
-function cameracontroller.resetinputs()
-	--- preserve non-delta inputs, stored in first 4 (gamepad pan, keyboard pan)
-	local plen = #cameracontroller.paninputs - 4
-	table.move(table.create(plen, 0), 1, plen, 5, cameracontroller.paninputs)
-	local zlen = #cameracontroller.zoominputs - 2
-	table.move(table.create(zlen, 0), 1, zlen, 3, cameracontroller.zoominputs)
-end
-
---- "...adjusts the touch sensitivity delta so that sensitivity is reduced when swiping up \
---- or down, but stays the same when swiping towards the middle of the screen"
-function cameracontroller.resolvetouchpitchsensitivity(delta: Vector3)
-	local camera = cameracontroller.camera
-
-	if not camera then
-		return delta
-	end
-	
-	--- get the camera pitch in world space
-	local pitch = camera.CFrame:ToEulerAnglesYXZ()
-	
-	if delta.Y*pitch >= 0 then
-		--- do not reduce sensitivity when pitching towards the horizon
-		return delta
-	end
-	
-	--- set up a line to fit: \
-	--- 1 = f(0) \
-	--- 0 = f(±pi/2)
-	local curveY = 1 - (2*math.abs(pitch)/math.pi)^0.75
-
-	--- remap curveY from [0, 1] -> [MIN_TOUCH_SENSITIVITY_FRACTION, 1]
-	local sensitivity = math.map(curveY, 0, 1, cameracontroller.touhchsensitivityfraction, 1)
-
-	return Vector3.new(1 * delta.X, sensitivity * delta.Y, 0)
-end
-
-function cameracontroller.mapsignedvaluetodeadzone(value: number, deadzone: number)
-	local abs = math.abs(value)
-	if abs > deadzone then
-		return math.map(abs, deadzone, 1, 0, 1) * math.sign(value)
-	else
-		return 0
-	end
-end
-
---- returns rotation input as a sum of all device inputs
-function cameracontroller.getrotationinput(dt: number, disablekeyboardrotation: boolean?)
-	--- `[1,  2]` gamepad x, y \
-	--- `[3,  4]` keyboard arrow l, r \
-	--- `[5,  6]` mouse delta x, y \
-	--- `[7,  8]` pointer pan delta x, y \
-	--- `[9, 10]` touch pan delta x, y
-	local paninputs = cameracontroller.paninputs
-
-	local gamepaddeadzone = cameracontroller.gamepaddeadzone
-	local gamepadx = cameracontroller.mapsignedvaluetodeadzone(paninputs[1], gamepaddeadzone)
-	local gamepady = cameracontroller.mapsignedvaluetodeadzone(paninputs[2], gamepaddeadzone)
-
-	local gamepadrotationvector = cameracontroller.gamepadspeed * Vector3.new(gamepadx, gamepady, 0) * UserGameSettings.MouseSensitivity
-	local keyboardrotationvector = cameracontroller.arrowkeyspeed * Vector3.new(paninputs[3] + paninputs[4], 0, 0) * dt
-	local mousemovevector = cameracontroller.mousespeed * Vector3.new(paninputs[5], paninputs[6], 0)
-	local pointerpanvector = cameracontroller.pointerspeed * Vector3.new(paninputs[7], paninputs[8], 0)
-	local touchpanvector = Vector3.zero
-	if cameracontroller.touchpanuserawinput == true then
-		touchpanvector = cameracontroller.touchspeed * Vector3.new(paninputs[9], paninputs[10], 0)
-	else
-		touchpanvector = cameracontroller.touchspeed * cameracontroller.resolvetouchpitchsensitivity(Vector3.new(paninputs[9], paninputs[10], 0))
-	end
-
-	local camerayinvertvector = Vector3.new(1, UserGameSettings:GetCameraYInvertValue(), 0)
-
-	if disablekeyboardrotation then
-		keyboardrotationvector *= Vector3.zero
-	end
-
-	return (
-		keyboardrotationvector
-		+ gamepadrotationvector
-		+ mousemovevector
-		+ pointerpanvector
-		+ touchpanvector
-	) * camerayinvertvector
-end
-
---- returns zoom input as a sum of all device inputs
-function cameracontroller.getzoominput()
-	local zoom = cameracontroller.zoominputs
-	local keyboardzoom = cameracontroller.keyzoomspeed * (zoom[1] + zoom[2])
-	local mousezoom = cameracontroller.mousezoomspeed * (-zoom[3] + zoom[4])
-	local touchzoom = cameracontroller.touchzoomspeed * (-zoom[5])
-
-	return keyboardzoom + mousezoom + touchzoom
-end
-
-function cameracontroller.touchguithumbstickframe(): Frame?
-	local playergui = localplayer:FindFirstChildOfClass("PlayerGui")::PlayerGui?
-	local touchgui = playergui and playergui:FindFirstChild("cc_touchgui")::ScreenGui?
-	local thumbstickframe = touchgui and touchgui:FindFirstChild("ThumbstickFrame")::Frame?
-
-	return thumbstickframe
-end
-
-function cameracontroller.ispointinbounds(point: Vector2, topleft: Vector2, bottomright: Vector2)
-	local cx, cy = point.X, point.Y
-
-	return 
-		cx >= topleft.X and
-		cy >= topleft.Y and
-		cx <= bottomright.X and
-		cy <= bottomright.Y
-end
-
-function cameracontroller.filterpoints(array: {Vector2}, topleft, bottomright)
-	for i = #array, 1, -1 do
-		local vec = array[i]
-		if cameracontroller.ispointinbounds(vec, topleft, bottomright) then
-			table.remove(array, i)
-		end
-	end
-end
-
 if RunService:IsClient() then
-	--- internal functions
-
-	--- `[1,  2]` gamepad x, y \
-	--- `[3,  4]` keyboard arrow l, r \
-	--- `[5,  6]` mouse delta x, y \
-	--- `[7,  8]` pointer pan delta x, y \
-	--- `[9, 10]` touch pan delta x, y
-	local paninputs = cameracontroller.paninputs
-
-	--- interally-called by contextaction "cc_camerathumbstick"
-	local function thumbstick(action: string, state: Enum.UserInputState, inputobject: InputObject): Enum.ContextActionResult?
-		if inputobject.KeyCode == Enum.KeyCode.Thumbstick2 then
-			local position = inputobject.Position
-			
-			paninputs[1] = position.X
-			paninputs[2] = -position.Y
-		end
-
-		return Enum.ContextActionResult.Pass
-	end
-
-	--- interally-called by userinputservice.inputbegan
-	local function mousemovement(inputobject: InputObject)
-		local delta = inputobject.Delta
-		paninputs[5] = delta.X
-		paninputs[6] = delta.Y
-	end
-
-	--- interally-called by contextaction "cc_camerakeypress"
-	local function keypress(action: string, state: Enum.UserInputState, inputobject: InputObject): Enum.ContextActionResult?
-		local keycode = inputobject.KeyCode
-		local value = state == Enum.UserInputState.Begin and 1 or 0
-		if keycode == Enum.KeyCode.I then
-			cameracontroller.zoominputs[1] = -value
-		elseif keycode == Enum.KeyCode.O then
-			cameracontroller.zoominputs[2] = value
-		elseif keycode == Enum.KeyCode.Left then
-			paninputs[3] = -value
-		elseif keycode == Enum.KeyCode.Right then
-			paninputs[4] = value
-		end
-
-		return nil
-	end
-
-	--- interally-called by userinputservice.pointeraction
-	local function pointeraction(wheel: number, pan: Vector2, pinch: number, sunkinput: boolean)
-		if sunkinput then return end
-
-		cameracontroller.zoominputs[3] = wheel
-		cameracontroller.zoominputs[4] = -pinch
-		paninputs[7] = pan.X
-		paninputs[8] = pan.Y
-	end
-
-	local lasttranslation = Vector2.zero
-
-	local function resettouchpan()
-		lasttranslation = Vector2.zero
-		paninputs[9] = 0
-		paninputs[10] = 0
-	end
-
-	--- interally-called by userinputservice.touchpan
-	local ispanvalid = false
-	local function touchpan(touchpositions: {Vector2}, totaltranslation: Vector2, velocity: Vector2, state: Enum.UserInputState, sunkinput: boolean)
-		if state ~= Enum.UserInputState.Change then
-			if state == Enum.UserInputState.Begin then
-				--- pan is only valid if initial touch was not within bounds of the touchgui thumbstick
-				local thumbstickframe = cameracontroller.touchguithumbstickframe()
-				if thumbstickframe then
-					local apos, asize = thumbstickframe.AbsolutePosition, thumbstickframe.AbsoluteSize
-					cameracontroller.filterpoints(touchpositions, apos, apos + asize)
-				end
-
-				ispanvalid = #touchpositions > 0
-			else
-				ispanvalid = false
-			end
-
-			resettouchpan()
-
-			return
-		end
-
-		if #touchpositions == 1 and ispanvalid then
-			local delta = totaltranslation - lasttranslation
-			lasttranslation = totaltranslation
-			paninputs[9] += delta.X
-			paninputs[10] += delta.Y
-
-			cameracontroller.paninputmap[Enum.UserInputType.Touch] = true
-		else
-			resettouchpan()
-			cameracontroller.paninputmap[Enum.UserInputType.Touch] = false
-		end
-	end
-
-	--- interally-called by userinputservice.touchpinch
-	local function touchpinch(touchpositions: {Vector2}, scale: number, velocity: number, state: Enum.UserInputState, sunkinput: boolean)
-		if state ~= Enum.UserInputState.Change then return end
-
-		local thumbstickframe = cameracontroller.touchguithumbstickframe()
-		if thumbstickframe then
-			local apos, asize = thumbstickframe.AbsolutePosition, thumbstickframe.AbsoluteSize
-			cameracontroller.filterpoints(touchpositions, apos, apos + asize)
-		end
-
-		if #touchpositions == 2 then
-			cameracontroller.zoominputs[5] = scale
-		end
-	end
-
-	--- interally-called by userinputservice.inputbegan
-	local function inputbegan(inputobject: InputObject, sunkinput: boolean)
-		if inputobject.UserInputType == Enum.UserInputType.MouseButton2 and not sunkinput then
-			cameracontroller.paninputmap[Enum.UserInputType.MouseButton2] = true
-			cameracontroller.holdpan = true
-		end
-		if inputobject.KeyCode == cameracontroller.gamepadzoomkeycode and not sunkinput then
-			cameracontroller.gamepadzoomstep(1)
-		end
-	end
-
-	--- interally-called by userinputservice.inputchanged
-	local function inputchanged(inputobject: InputObject, sunkinput: boolean)
-		if inputobject.UserInputType == Enum.UserInputType.MouseMovement then
-			mousemovement(inputobject)
-		end
-	end
-
-	--- interally-called by userinputservice.inputended
-	local function inputended(inputobject: InputObject, sunkinput: boolean)
-		if inputobject.UserInputType == Enum.UserInputType.MouseButton2 then
-			cameracontroller.paninputmap[Enum.UserInputType.MouseButton2] = false
-			cameracontroller.holdpan = false
-		elseif inputobject.UserInputType == Enum.UserInputType.Touch then
-			resettouchpan()
-		end
-	end
-
 	do
 		--- write player zoom to camera zoom
 		cameracontroller.cameraminzoomdistance = localplayer.CameraMinZoomDistance
@@ -785,35 +456,6 @@ if RunService:IsClient() then
 		s.mindistance = mindistance
 		s.maxdistance = maxdistance
 	end
-
-	--- thumbstick
-	ContextActionService:BindActionAtPriority(
-		"cc_camerathumbstick",
-		thumbstick,
-		false,
-		cameracontroller.inputpriority,
-		Enum.KeyCode.Thumbstick2
-	)
-	--- keyboard
-	ContextActionService:BindActionAtPriority(
-		"cc_camerakeypress",
-		keypress,
-		false,
-		cameracontroller.inputpriority,
-		Enum.KeyCode.Left,
-		Enum.KeyCode.Right,
-		Enum.KeyCode.I,
-		Enum.KeyCode.O
-	)
-	--- pointer
-	UserInputService.PointerAction:Connect(pointeraction)
-	--- touch pan, pinch
-	UserInputService.TouchPan:Connect(touchpan)
-	UserInputService.TouchPinch:Connect(touchpinch)
-	--- mouse/inputbeganchangedended
-	UserInputService.InputBegan:Connect(inputbegan)
-	UserInputService.InputChanged:Connect(inputchanged)
-	UserInputService.InputEnded:Connect(inputended)
 
 	--- camera step
 	RunService:BindToRenderStep(cameracontroller.renderstepfunctionname, cameracontroller.renderpriority, cameracontroller.step)

@@ -40,13 +40,13 @@ end
 --- humanoidless player controller and replicator \
 --- [*view cc on github*](https://github.com/00826/cc)
 local cc = {
-	replication = require(script.replication);
-	interpolation = require(script.interpolation);
+	replication = require(script:WaitForChild("replication"));
+	interpolation = require(script:WaitForChild("interpolation"));
 
-	rig = require(script.rig);
-	cameracontroller = require(script.cameracontroller);
-	inputcontroller = require(script.inputcontroller);
-	viewport = require(script.viewport);
+	rig = require(script:WaitForChild("rig"));
+	cameracontroller = require(script:WaitForChild("cameracontroller"));
+	inputcontroller = require(script:WaitForChild("inputcontroller"));
+	viewport = require(script:WaitForChild("viewport"));
 
 	input = {
 		--- empty raycastparams

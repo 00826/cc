@@ -45,11 +45,7 @@ ccinput.floorcastextend = 1/8
 ccinput.radiusextend = -1/8
 
 --- set cameracontroller zoom behavior
-cameracontroller.zoombehavior = "step"
-
---- set cameracontroller touch device pan use raw (non-curved) input
---- for responsiveness
-cameracontroller.touchpanuserawinput = true
+cameracontroller.zoombehavior = "snap"
 
 --- set camera fov
 camera.FieldOfView = 90
@@ -161,11 +157,16 @@ end
 local function step(dt: number)
 	debug.profilebegin("cc_step")
 
+	local inputvector = inputcontroller.blobreadinputvector()
+	if vector.magnitude(inputvector::any) < inputcontroller.inputvectordeadzone then
+		inputvector = Vector3.zero
+	end
+
 	--- set inputvector from inputcontroller
 	--- set cameracframe from currentcamera
 	--- both are set externally for cases such as overriding the input vector
 	--- or setting the camera to a preset/external cframe for something like a spectate mode
-	ccinput.inputvector = inputcontroller.vector
+	ccinput.inputvector = inputvector
 	ccinput.cameracframe = camera.CFrame
 
 	--- interpolate camera shake vectors toward zero using some arbitrary interpolant
@@ -192,7 +193,7 @@ local function step(dt: number)
 
 			--- if zero input vector or airborne, zero-out xz components of body velocity
 			--- otherwise keep normal
-			if inputcontroller.vector == Vector3.zero or ccoutput.floor == nil then
+			if inputvector == Vector3.zero or ccoutput.floor == nil then
 				ccinput.bodyvelocitymaxforcemodifier = Vector3.yAxis
 			else
 				ccinput.bodyvelocitymaxforcemodifier = Vector3.one
@@ -284,7 +285,7 @@ local function step(dt: number)
 	--- write movevector
 	--- special case exists for up/down inputs as jumping and crouching are 2 separate inputs
 	--- with their own independent behaviors
-	local movevector = inputcontroller.vector
+	local movevector = inputvector
 	replication.writeinput(
 		r,
 		movevector.X,
@@ -508,8 +509,10 @@ local function animate(dt: number)
 		--- resolve resync buffer
 		--- if player == localplayer then override with local replication
 		local resync
+		local inputvector = Vector3.zero
 		if islocal then
 			resync = replication.self
+			inputvector = inputcontroller.blobreadinputvector()
 		else
 			local _, r = replication.findbyuserid(player.UserId)
 			if r then
@@ -536,7 +539,7 @@ local function animate(dt: number)
 		local ix, iy, iz = replication.readinput(resync)
 		local xsign
 		if islocal then
-			xsign = inputcontroller.vector.X
+			xsign = inputvector.X
 		else
 			xsign = ix
 		end
@@ -544,7 +547,7 @@ local function animate(dt: number)
 		
 		local ysign
 		if islocal then
-			ysign = inputcontroller.vector.Y
+			ysign = inputvector.Y
 		else
 			ysign = iy
 		end
@@ -552,7 +555,7 @@ local function animate(dt: number)
 		
 		local zsign
 		if islocal then
-			zsign = inputcontroller.vector.Z
+			zsign = inputvector.Z
 		else
 			zsign = iz
 		end
