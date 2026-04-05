@@ -139,14 +139,14 @@ local inputcontroller = {
 
 	--- `Enum.DisplaySize -> touch thumbstick ring size` conversion table
 	thumbstickringmap = {
-		[Enum.DisplaySize.Small] = UDim2.fromOffset(72, 72);
-		[Enum.DisplaySize.Medium] = UDim2.fromOffset(96, 96);
+		[Enum.DisplaySize.Small] = UDim2.fromOffset(96, 96);
+		[Enum.DisplaySize.Medium] = UDim2.fromOffset(112, 112);
 		[Enum.DisplaySize.Large] = UDim2.fromOffset(128, 128);
 	};
 	--- `Enum.DisplaySize -> touch thumbstick circle size` conversion table
 	thumbstickcirclemap = {
-		[Enum.DisplaySize.Small] = UDim2.fromOffset(36, 36);
-		[Enum.DisplaySize.Medium] = UDim2.fromOffset(48, 48);
+		[Enum.DisplaySize.Small] = UDim2.fromOffset(48, 48);
+		[Enum.DisplaySize.Medium] = UDim2.fromOffset(56, 56);
 		[Enum.DisplaySize.Large] = UDim2.fromOffset(64, 64);
 	};
 	--- `Enum.DisplaySize -> touch thumbstickframe size` conversion table

@@ -168,7 +168,7 @@ return function(
 			--- leftshoulder.C0 = leftshoulderc0 * CFrame.fromOrientation(0, 0, -math.pi)
 		end
 		righthip.DesiredAngle = addhipangle
-		lefthip.DesiredAngle = addhipangle
+		lefthip.DesiredAngle = -addhipangle
 
 		--- righthip.C0 = lefthipc0 * CFrame.fromOrientation(0, 0, addhipangle)
 		--- lefthip.C0 = righthipc0 * CFrame.fromOrientation(0, 0, -addhipangle)
@@ -201,8 +201,8 @@ return function(
 		rightshoulder.MaxVelocity = 0.333
 		leftshoulder.MaxVelocity = 0.333
 
-		crouchpadding = 0.050
-		crouchswing = 1 * math.pi/2
+		--- crouchpadding = 0.050
+		--- crouchswing = 1 * math.pi/2
 	end
 
 	rightshoulder.DesiredAngle = (crouchpadding * desiredangle) - crouchswing
