@@ -41,7 +41,6 @@ end
 --- [*view cc on github*](https://github.com/00826/cc)
 local cc = {
 	replication = require(script:WaitForChild("replication"));
-	interpolation = require(script:WaitForChild("interpolation"));
 
 	rig = require(script:WaitForChild("rig"));
 	cameracontroller = require(script:WaitForChild("cameracontroller"));
@@ -114,7 +113,9 @@ local cc = {
 		--- world-relative move vector
 		truevector = Vector3.zero;
 		--- speed of cc rootpart
-		speed = 0
+		speed = 0;
+
+		infirstperson = false;
 	};
 
 	--- cc character container instance
@@ -131,8 +132,8 @@ local cc = {
 		sphererenderfidenlity = Enum.RenderFidelity.Performance;
 	};
 
-	spheretransparency = 1; --- 1
-	roottransparency = 1; --- 1
+	spheretransparency = 1;
+	roottransparency = 1;
 }
 
 --- creates new character
@@ -236,21 +237,21 @@ function cc.create(bodymovers: boolean?)
 		end
 	end
 
-	do --- hitbox
-		--- dot/sphere approximately where rigjoint motor c0 is
-		local hb = Instance.new("SphereHandleAdornment")
-		hb.Name = "Hitbox"
-		hb.CFrame = CFrame.new(Vector3.yAxis * 2)
-		hb.Color3 = Color3.fromRGB(163, 162, 165)
-		hb.Transparency = 0
-		hb.AdornCullingMode = Enum.AdornCullingMode.Never
-		hb.AlwaysOnTop = true
-		hb.Radius = 0.125
-		hb.Visible = false
-		hb.ZIndex = 1
-		hb.Adornee = rootpart
-		hb.Parent = rootpart
-	end
+	--- do --- hitbox
+	--- 	--- dot/sphere approximately where rigjoint motor c0 is
+	--- 	local hb = Instance.new("SphereHandleAdornment")
+	--- 	hb.Name = "Hitbox"
+	--- 	hb.CFrame = CFrame.new(Vector3.yAxis * 2)
+	--- 	hb.Color3 = Color3.fromRGB(163, 162, 165)
+	--- 	hb.Transparency = 0
+	--- 	hb.AdornCullingMode = Enum.AdornCullingMode.Never
+	--- 	hb.AlwaysOnTop = true
+	--- 	hb.Radius = 0.125
+	--- 	hb.Visible = false
+	--- 	hb.ZIndex = 1
+	--- 	hb.Adornee = rootpart
+	--- 	hb.Parent = rootpart
+	--- end
 	
 	for _, thing in character:QueryDescendants("BasePart") do
 		if thing:IsA("BasePart") then
@@ -374,7 +375,9 @@ function cc.step(character: typeof(cc.create()))
 
 	--- update output
 
-	local x, y = cameracframe:ToOrientation()
+	--- local x, y = cameracframe:ToOrientation()
+
+	local x, y = cc.cameracontroller.camera.CFrame:ToOrientation()
 
 	output.position = rootpart.Position
 	output.rotationx = x

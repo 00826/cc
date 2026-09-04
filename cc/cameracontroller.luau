@@ -28,7 +28,7 @@ end
 --- advances spring by `dt`
 @native
 function springstep(s: typeof(createspring(...)), dt: number)
-	local freq = s.frequency * 2 * math.pi --- Convert from Hz to rad/s
+	local freq = s.frequency * math.tau --- Convert from Hz to rad/s
 	local distance = s.distance
 	local velocity = s.velocity
 	local mindistance = s.mindistance
@@ -129,15 +129,12 @@ local cameracontroller = {
 	--- and written-to externally
 	camera = workspace.CurrentCamera;
 
+	--- written externally \
+	freecam = false;
+
 	--- internal cameramode \
 	--- this overwrites `cameracontroller.camera.CameraMode`
 	cameramode = Enum.CameraMode.Classic;
-	--- internal lockfirstperson \
-	--- this overwrites `cameracontroller.camera.CameraType` \
-	--- \
-	--- this should be either custom or scriptable \
-	--- as all other cameratypes behaviors are best handled externally
-	cameratype = Enum.CameraType.Custom;
 	
 	--- shiftlock value \
 	--- original value: `Vector3.new(1.75, 0, 0)`
@@ -218,6 +215,9 @@ local cameracontroller = {
 
 	--- runservice bindtorenderstep(cameracontroller.renderstepfunctionname, ..., cameracontroller.step)
 	renderstepfunctionname = "camerastep";
+
+	--- avoid noise
+	lastemittedcameratypewarning = Enum.CameraType.Custom;
 }
 
 --- advances cameracontroller by `dt`
@@ -228,10 +228,18 @@ function cameracontroller.step(dt: number)
 	local realtime = now - cameracontroller.laststep
 
 	local camera = cameracontroller.camera
+	local cameratype = camera.CameraType
 
 	--- early exit if scriptable
-	if cameracontroller.cameratype == Enum.CameraType.Scriptable then
+	if cameratype == Enum.CameraType.Scriptable then
 		inputcontroller.blobreset()
+		return
+	elseif cameratype ~= Enum.CameraType.Custom then
+		if cameracontroller.lastemittedcameratypewarning ~= cameratype then
+			cameracontroller.lastemittedcameratypewarning = cameratype
+			warn(string.format("cc cameratype to be either Scriptable or Custom, cameratype is currently '%s'", cameratype.Name))
+		end
+		
 		return
 	end
 
@@ -291,8 +299,9 @@ function cameracontroller.step(dt: number)
 
 	--- resolve rotations
 	local rotateinput = inputcontroller.blobreadrotationvector(realtime)
+	local modifiedrotateinput = rotateinput * inputcontroller.sensitivitymodifier
 	local camerafocusposition = camerasubjectcframe.Position
-	local newlookvector = cameracontroller.rotatelookvector(cameralookvector, rotateinput)
+	local newlookvector = cameracontroller.rotatelookvector(cameralookvector, modifiedrotateinput)
 
 	--- resolve camera cframes
 	local realcframe = CFrame.lookAlong(camerafocusposition - (zoomdistance * newlookvector), newlookvector)
@@ -446,7 +455,7 @@ if RunService:IsClient() then
 		cameracontroller.currentzoomdistance = defaultzoomdistance
 
 		--- rotate camera
-		--- cameracontroller.camera.CFrame = CFrame.Angles(math.rad(15), 0, 0)
+		cameracontroller.camera.CFrame = cameracontroller.initialcameraangle
 
 		--- write defaults to spring
 		local s = cameracontroller.zoomspring

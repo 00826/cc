@@ -75,6 +75,22 @@ local replication = {
 
 	--- unreliableremoteevent byte limit
 	unreliablebytelimit = 1000;
+	
+	--- default breakpoint reset frame
+	breakpointresetframe = 60;
+
+	--- interpolation settings
+
+	--- base value for resolving framerate-independent interpolant `1 - (base ^ dt)`
+	interpolationbase = 10e-11;
+	--- interpolation motor6d part0
+	interpolationmotorpart0 = workspace.Terrain;
+	--- table of interpolation targets \
+	--- written-to and read-from externally
+	interpolationtargets = {} :: {[string]: { character: Model, motor: Motor6D, adornment: HandleAdornment? }};
+	interpolationadornmentsenabled = false;
+	interpolationmotorflag = "_interpolationmotor";
+	interpolationadornmentflag = "_interpolationadornment";
 }
 
 --- creates a replication buffer
@@ -292,7 +308,22 @@ end
 
 --- allocates resync buffers from resynccache to bigbuffer
 function replication.bigbufferalloc(b: buffer, allocate: number, timestamp: number)
-	if allocate > 0 then
+	local len = replication.resynctimeoffset
+	for i = 1, allocate do
+		local resync = replication.resynccache[i]
+		if resync then
+			local offset = (i - 1) * len
+			--- copy into bigbuffer
+			buffer.copy(b, offset, resync, 0, len)
+			--- create-and-insert snapshot
+			local snapshot = replication.createsnapshotbuffer(resync, timestamp)
+			local userid = replication.resyncreaduserid(resync)
+			replication.snapshotinsert(userid, snapshot)
+		else
+			break
+		end
+	end
+	--[[if allocate > 0 then
 		local len = replication.resynctimeoffset
 		local offset = (allocate - 1) * len
 		local resync = table.remove(replication.resynccache, 1)
@@ -310,7 +341,7 @@ function replication.bigbufferalloc(b: buffer, allocate: number, timestamp: numb
 		end
 	else
 		return
-	end
+	end]]
 end
 
 --- resyncs replication buffer from client
@@ -326,8 +357,8 @@ function replication.bigbufferserverresync(player: Player, challengereplication:
 	end
 
 	--- resync replication
-	local index, resync = replication.findbyuserid(userid)
-	if index and resync then
+	local _, resync = replication.findbyuserid(userid)
+	if resync then
 		replication.resyncwritereplication(resync, challengereplication)
 	else
 		resync = replication.createresyncbuffer()
@@ -468,11 +499,37 @@ function replication.snapshotflush(snapshots: {buffer}, timestamp: number)
 end
 
 --- reads interpolated position between `a` and `b` wrt interpolant `t`
-function replication.snapshotreadposition(a: buffer, b: buffer, t: number)
-	local apos = replication.readposition(a)
-	local bpos = replication.readposition(b)
+function replication.snapshotinterpolateposition(snapshots: {buffer}, timestamp: number)
+	local a = snapshots[1]
+	local b = snapshots[2]
+	if a and b then
+		local apos = replication.readposition(a)
+		local atime = replication.resyncreadtime(a)
+		local bpos = replication.readposition(b)
+		local btime = replication.resyncreadtime(b)
 
-	return (vector.lerp(apos::any, bpos::any, t)::any)::Vector3
+		local t = math.clamp(math.map(timestamp, btime, atime, 0, 1), 0, 1)
+
+		return (vector.lerp(bpos::any, apos::any, t)::any)::Vector3
+	elseif a then
+		return replication.readposition(a)
+	else
+		return Vector3.zero
+	end
+end
+
+--- returns delta position
+function replication.snapshotreaddeltaposition(snapshots: {buffer})
+	local a = snapshots[1]
+	local b = snapshots[2]
+	if a and b then
+		local apos = replication.readposition(a)
+		local bpos = replication.readposition(b)
+
+		return apos - bpos
+	else
+		return Vector3.zero
+	end
 end
 
 --- performs binary search on snapshots, starting at `i (?=1)` and ending at `j (?=#t)` \
@@ -533,6 +590,119 @@ function replication.snapshotnearestbinarysearch(snapshots: {buffer}, timestamp:
 		
 		return replication.snapshotnearestbinarysearch(snapshots, timestamp, i, j)
 	end
+end
+
+--- creates an interpolation target
+function replication.createinterpolationtarget(
+	character: Model,
+	adornmentconfig: {
+		class: (
+			| "BoxHandleAdornment"
+			| "ConeHandleAdornment"
+			| "CylinderHandleAdornment"
+			| "ImageHandleAdornment"
+			| "LineHandleAdornment"
+			| "PyramidHandleAdornment"
+			| "SphereHandleAdornment"
+			| "WireframeHandleAdornment"
+		),
+		transparency: number,
+		color: Color3
+	}?
+)
+	local name = character.Name
+
+	local motor6d = Instance.new("Motor6D")
+	motor6d.Name = name .. replication.interpolationmotorflag
+	motor6d.Part0 = replication.interpolationmotorpart0
+	motor6d.Part1 = character.PrimaryPart
+	motor6d.Parent = replication.interpolationmotorpart0
+	
+	local adornment
+	if adornmentconfig ~= nil then
+		adornment = Instance.new(adornmentconfig.class::any)::HandleAdornment
+		adornment.Name = name .. replication.interpolationadornmentflag
+		adornment.Visible = replication.interpolationadornmentsenabled
+		adornment.Transparency = adornmentconfig.transparency
+		adornment.Color3 = adornmentconfig.color
+		adornment.Adornee = motor6d.Part1::any
+		adornment.Parent = replication.interpolationmotorpart0
+	end
+
+	return {
+		character = character;
+		motor = motor6d;
+		adornment = adornment;
+	}
+end
+
+function replication.interpolationrefreshadornments(t: {[string]: typeof(replication.createinterpolationtarget(...))})
+	for a, b in t do
+		for k, v in pairs(b::any) do
+			if typeof(v) == "Instance" then
+				if v:IsA("HandleAdornment") then
+					v.Visible = replication.interpolationadornmentsenabled
+				end
+			end
+		end
+	end
+end
+
+--- destroys interpolation target
+function replication.interpolationtargetdestroy(t: typeof(replication.createinterpolationtarget(...)))
+	for k, v in pairs(t::any) do
+		if typeof(v) == "Instance" then
+			if v:IsA("Motor6D") then
+				v.Part0 = nil
+				v.Part1 = nil
+			elseif v:IsA("HandleAdornment") then
+				v.Adornee = nil::any
+			end
+
+			v:Destroy()
+		end
+	end
+
+	table.clear(t)
+end
+
+--- creates a breakpoint table \
+--- frames should be divide evenly into `replication.breakpointresetframe` and sorted by distance in ascending order
+function replication.createbreakpoints(values: {{ distance: number, interpolate: boolean, frame: number }})
+	return {
+		focus = Vector3.zero;
+		frame = 0;
+		resetframe = replication.breakpointresetframe;
+		values = values;
+	}
+end
+
+--- advances breakpoint frame forward by integer value \
+--- resets frame to 0 if `frame >= 60`
+function replication.breakpointstep(b: typeof(replication.createbreakpoints(...)), value: number)
+	b.frame += value
+	if b.frame >= b.resetframe then
+		b.frame = 0
+	end
+
+	return b.frame
+end
+
+--- returns breakpoint value wrt distance between position and breakpoint focus
+function replication.breakpointreadvalue(b: typeof(replication.createbreakpoints(...)), position: Vector3)
+	local distance = vector.magnitude(b.focus - position::any)
+	for i, breakpoint in ipairs(b.values) do
+		if distance < breakpoint.distance then
+			return i, breakpoint
+		end
+	end
+
+	return #b.values + 1, b.values[#b.values] or { distance = math.huge, interpolate = false, frame = 1 }
+end
+
+--- returns framerate-independent interpolant
+function replication.i(dt: number)
+	return 1 - (replication.interpolationbase ^ dt)
 end
 
 --- replication

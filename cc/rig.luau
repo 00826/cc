@@ -33,8 +33,8 @@ local rig = {
 		TwistUpperAngle = 25;
 	};
 
-	boytorso = "rbxassetid://17580060252";
-	girltorso = "rbxassetid://70841440477204";
+	boytorso = "rbxassetid://125569157384461";
+	girltorso = "rbxassetid://120227818506517";
 }
 
 --- creates a typed limbdescription
@@ -70,6 +70,7 @@ function rig.create(limbmap: {[string]: typeof(rig.createlimbdescription())})
 	--- animationcontroller
 	local animationcontroller = Instance.new("AnimationController")
 	local animator = Instance.new("Animator")
+	animator.PreferLodEnabled = false
 	animator.Parent = animationcontroller
 	animationcontroller.Parent = r
 
@@ -223,7 +224,7 @@ function rig.applybodycolors(r: typeof(rig.create(...)), limbmap: {[string]: typ
 end
 
 --- applies clothing textures to rig
-function rig.applyclothing(r: typeof(rig.create(...)), limbmap: {[string]: typeof(rig.createlimbdescription())}, clothing: { Shirt: string?; Pants: string?; ShirtColor: Color3?; PantsColor: Color3?; } & { [string]: any })
+function rig.applyclothing(r: typeof(rig.create(...)), limbmap: {[string]: typeof(rig.createlimbdescription())}, clothing: { Shirt: string?; Pants: string?; ShirtColor: Color3|string?; PantsColor: Color3|string?; } & { [string]: any })
 	for name, entry in limbmap do
 		local clothingproperties = entry.humanoiddescriptionclothingproperties
 		for _, property in clothingproperties do
@@ -235,10 +236,14 @@ function rig.applyclothing(r: typeof(rig.create(...)), limbmap: {[string]: typeo
 			if property == "Shirt" then
 				targetcolor = clothing.ShirtColor or targetcolor
 			elseif property == "Pants" then
-				targetcolor = clothing.ShirtColor or targetcolor
+				targetcolor = clothing.PantsColor or targetcolor
+			elseif property == "Jersey" then
+				targetcolor = clothing.JerseyColor or targetcolor
 			else
 				warn(string.format("expected Shirt or Pants, got unknown property %s", property))
 			end
+
+			if type(targetcolor) == "string" then targetcolor = Color3.fromHex(targetcolor) end
 
 			for _, limb in r:QueryDescendants(string.format(">[ClassName = Part][Name = %s]", name)) do
 				for _, layer in limb:QueryDescendants(string.format(">[ClassName = Decal][Name = %s]", property)) do

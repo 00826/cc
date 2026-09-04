@@ -394,7 +394,7 @@ local function createplayercharacter(player: Player)
 	if islocal then
 		local head = character:WaitForChild("Head")
 		camera.CameraSubject = head:IsA("BasePart") and head or nil
-		camera.CameraType = Enum.CameraType.Custom
+		--- camera.CameraType = Enum.CameraType.Custom
 
 		cameracontroller.resetcameraangle = true
 

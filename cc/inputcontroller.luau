@@ -22,6 +22,14 @@ local function vectorxytovector3(vec: Vector2|Vector3)
 	return Vector3.new(vec.X, vec.Y, 0)
 end
 
+--- clamps a within radius of b
+@native
+local function clampatob(a: Vector3, b: Vector3, radius: number)
+	local r = math.min(vector.magnitude(a::any - b::any), radius)
+
+	return ((vector.normalize(a::any - b::any) * r)::any)::Vector3
+end
+
 --- returns whether `inputobject.position` is within bounds of box defined by `absoluteposition` and `absolutesize`
 @native
 local function isinputinbounds(absoluteposition: Vector2, absolutesize: Vector2, inputobject: InputObject)
@@ -73,6 +81,9 @@ local inputcontroller = {
 	--- `[24]`: gamepad right stick y
 	--- `[25]`: gamepad right stick press
 	blob = table.create(25, 0);
+	sensitivitymodifier = 1;
+
+	staticthumbstick = false;
 
 	blobkeymap = {
 		[Enum.UserInputType.MouseMovement] = { index = 0; value = 0; preferredinput = Enum.PreferredInput.KeyboardAndMouse };
@@ -98,7 +109,7 @@ local inputcontroller = {
 	} :: {[Enum.KeyCode|Enum.UserInputType]: {index: number, value: number, preferredinput: Enum.PreferredInput}};
 
 	--- interally-resolved preferred input based on recency
-	preferredinput = Enum.PreferredInput.KeyboardAndMouse;
+	preferredinput = Enum.PreferredInput.Touch;
 	preferredinputflag = "cc_preferredinput";
 
 	--- `Enum.UserInputType -> Enum.PreferredInput` conversion table \
@@ -144,7 +155,9 @@ local inputcontroller = {
 	--- pointer action (trackpad) connection
 	pointeractionconnection = nil :: RBXScriptConnection?;
 
-	inputvectordeadzone = 0.1;
+	gamepadthumbstick1deadzone = 0.1;
+	gamepadthumbstick2deadzone = 0.1;
+	inputvectordeadzone = 0.01;
 	inputrotationspeedconfig = {
 		--- arrow key camera pan speed in radians/sec \
 		--- ROTATION_SPEED_KEYS
@@ -200,6 +213,14 @@ local inputcontroller = {
 	touchmovedconnection = nil :: RBXScriptConnection?;
 	touchendedconnection = nil :: RBXScriptConnection?;
 
+	touchzoominactivatedistance = 96;
+	touchcanzoomin = false;
+	touchzoomoutactivatedistance = 128;
+	touchcanzoomout = false;
+
+	--- if a touch input is in the bounds of any guiobjects inside this array, the input will not be considered for touch gestures
+	touchsinkguiobjects = {} :: {GuiObject};
+
 	--- current touch gui \
 	--- touchgui is always instantiated
 	--- regardless of current input \
@@ -239,20 +260,29 @@ local inputcontroller = {
 			frameposition = UDim2.new(0, 0, 0.333, 0);
 		};
 		[Enum.DisplaySize.Medium] = {
-			circlesize = UDim2.fromOffset(56, 56);
-			ringsize = UDim2.fromOffset(112, 112);
+			circlesize = UDim2.fromOffset(64, 64);
+			ringsize = UDim2.fromOffset(128, 128);
 			framesize = UDim2.new(0.400, 0, 0.667, 0);
 			frameposition = UDim2.new(0, 0, 0.333, 0);
 		};
 		[Enum.DisplaySize.Large] = {
-			circlesize = UDim2.fromOffset(64, 64);
-			ringsize = UDim2.fromOffset(128, 128);
+			circlesize = UDim2.fromOffset(72, 72);
+			ringsize = UDim2.fromOffset(144, 144);
 			framesize = UDim2.new(0.400, 0, 0.667, 0);
 			frameposition = UDim2.new(0, 0, 0.333, 0);
 		};
 	};
 
 	contextactionname = "cc_input";
+
+	debuggui = nil :: ScreenGui?;
+	debugguitextlabel = nil :: TextLabel?;
+	debugguifont = Enum.Font.Arcade;
+	debugguitext = "";
+	debugguitextsize = 20;
+	debugguitextcolor = Color3.fromRGB(255, 255, 255);
+	debugguimarkcolorhex = "000000";
+	debugguimarktransparency = 0/3;
 }
 
 --- returns an xz movement vector as a sum of select index-value pairs in `inputcontroller.blob` \
@@ -284,20 +314,24 @@ function inputcontroller.blobresetinputvector()
 	blob[21] = 0
 end
 
+UserGameSettings:SetGamepadCameraSensitivityVisible()
+
 --- returns an xy rotation vector (in radians/sec) as a sum of select index-value pairs in `inputcontroller.blob` \
---- accounts for game settings
+--- accounts for game settings \
+--- does not account for `inputcontroller.sensitivitymodifier`
 @native
 function inputcontroller.blobreadrotationvector(dt: number)
 	local blob = inputcontroller.blob
 	local inputrotationspeedconfig = inputcontroller.inputrotationspeedconfig		 
 	
 	local mousesensitivity = UserGameSettings.MouseSensitivity
+	local gamepadsensitivity = UserGameSettings.GamepadCameraSensitivity
 
 	local arrowkeyspeed = inputrotationspeedconfig.arrowkeyspeed * dt
 	local mousespeed = inputrotationspeedconfig.mousespeed
 	local pointerspeed = inputrotationspeedconfig.pointerspeed
 	local touchspeed = inputrotationspeedconfig.touchspeed
-	local gamepadspeed = inputrotationspeedconfig.gamepadspeed * mousesensitivity
+	local gamepadspeed = inputrotationspeedconfig.gamepadspeed * gamepadsensitivity
 
 	local touchdeltax, touchdeltay = blob[15], blob[16]
 	if (inputcontroller.touchrotationusescurvedinput == true) and (inputcontroller.preferredinput == Enum.PreferredInput.Touch) then
@@ -429,6 +463,9 @@ function inputcontroller.blobreset()
 	for index = 1, #blob do
 		blob[index] = 0
 	end
+
+	inputcontroller.touchobject = nil
+	table.clear(inputcontroller.nonthumbsticktouchobjects)
 end
 
 --- sets select range of index-value pairs in `inputcontroller.blob` to 0
@@ -555,14 +592,27 @@ function inputcontroller.gamepad(action: string, inputstate: Enum.UserInputState
 		--- x/y
 		local position = inputobject.Position
 		local blob = inputcontroller.blob
-		blob[20] = position.X
-		blob[21] = position.Y
+
+		if vector.magnitude(position::any) < inputcontroller.gamepadthumbstick1deadzone then
+			blob[20] = 0
+			blob[21] = 0
+		else
+			blob[20] = position.X
+			blob[21] = position.Y
+		end
+
 	elseif inputobject.KeyCode == Enum.KeyCode.Thumbstick2 then
 		--- x/y
 		local position = inputobject.Position
 		local blob = inputcontroller.blob
-		blob[23] = position.X
-		blob[24] = position.Y
+
+		if vector.magnitude(position::any) < inputcontroller.gamepadthumbstick2deadzone then
+			blob[23] = 0
+			blob[24] = 0
+		else
+			blob[23] = position.X
+			blob[24] = position.Y
+		end
 	else
 		local keycode = inputobject.KeyCode
 		local mapping = inputcontroller.blobkeymap[keycode]
@@ -590,9 +640,16 @@ function inputcontroller.touch(action: string, inputstate: Enum.UserInputState, 
 	local circle = (thumbstickframe::any).Circle::Frame
 
 	if inputstate == Enum.UserInputState.Begin then
+		--- for _, guiobject in ipairs(inputcontroller.touchsinkguiobjects) do
+		--- 	if isinputinbounds(guiobject.AbsolutePosition, guiobject.AbsoluteSize, inputobject) then
+		--- 		return Enum.ContextActionResult.Pass
+		--- 	end
+		--- end
+
 		if isinputinbounds(thumbstickframeapos, thumbstickframeasize, inputobject) then
 			--- intent to use thumbstick
 			if inputcontroller.touchobject == nil then
+				if not touchgui.Enabled then return nil end
 				--- no current touchobject
 				inputcontroller.touchobject = inputobject
 
@@ -611,16 +668,46 @@ function inputcontroller.touch(action: string, inputstate: Enum.UserInputState, 
 				table.insert(inputcontroller.nonthumbsticktouchobjects, inputobject)
 				--- print(string.format("(began) touches on screen: [%d]", #inputcontroller.nonthumbsticktouchobjects))
 			end
+
+			local t = inputcontroller.nonthumbsticktouchobjects
+			if #t == 2 then
+				local io1: InputObject, io2: InputObject = t[1], t[2]
+				local position1, position2 = io1.Position, io2.Position
+				local distance = vector.magnitude(position2::any - position1::any)
+
+				if distance < inputcontroller.touchzoominactivatedistance then
+					inputcontroller.touchcanzoomin = true
+					inputcontroller.touchcanzoomout = false
+				elseif distance > inputcontroller.touchzoomoutactivatedistance then
+					inputcontroller.touchcanzoomin = false
+					inputcontroller.touchcanzoomout = true
+				else
+					inputcontroller.touchcanzoomin = false
+					inputcontroller.touchcanzoomout = false
+				end
+			else
+				inputcontroller.touchcanzoomin = false
+				inputcontroller.touchcanzoomout = false
+			end
 		end
 	elseif inputstate == Enum.UserInputState.Change then
 		if inputcontroller.touchobject == inputobject then
+			if not touchgui.Enabled then return nil end
 			--- intent to move
+			--- inputcontroller.touchcurrentposition = inputposition
+			local radius = ring.AbsoluteSize.X * 0.5
 			inputcontroller.touchcurrentposition = inputposition
 
-			local delta = inputcontroller.touchcurrentposition - inputcontroller.touchstartposition
+			local staticthumbstick = inputcontroller.staticthumbstick
+			local delta
+			if inputcontroller.staticthumbstick then
+				delta = clampatob(inputposition, inputcontroller.touchstartposition, radius)
+			else
+				delta = inputcontroller.touchcurrentposition - inputcontroller.touchstartposition
+			end
+
 			local direction = (vector.normalize(delta::any)::any)::Vector3
 			local distance = vector.magnitude(delta::any)
-			local radius = ring.AbsoluteSize.X * 0.5
 			local innerradius = inputcontroller.touchdeadzone * radius
 			if distance > radius then
 				local dragpos = inputcontroller.touchstartposition + (direction * (distance - radius))
@@ -638,7 +725,13 @@ function inputcontroller.touch(action: string, inputstate: Enum.UserInputState, 
 				inputcontroller.blobresetinputvector()
 			end
 
-			local inputudim2 = vectorxytoudim2(inputposition)
+			local inputudim2
+			if staticthumbstick then
+				inputudim2 = vectorxytoudim2(inputcontroller.touchstartposition + delta)
+			else
+				inputudim2 = vectorxytoudim2(inputposition)
+			end
+			
 			circle.Position = inputudim2
 			
 			return Enum.ContextActionResult.Sink
@@ -646,14 +739,34 @@ function inputcontroller.touch(action: string, inputstate: Enum.UserInputState, 
 			--- intent to pan/pinch
 			local t = inputcontroller.nonthumbsticktouchobjects
 			local len = #t
-			if len == 1 then
-				--- intent to pan
-				local delta = t[1].Delta
+			--- intent to pan
+			if len > 0 then
+				--- use biggest delta
+				local delta = Vector3.zero
+				local magnitude = 0
+				for _, io in ipairs(t) do
+					local thisdelta = (io::any).Delta
+					local thismagnitude = vector.magnitude(thisdelta)
+					if magnitude < thismagnitude then
+						magnitude = thismagnitude
+						delta = thisdelta
+					end
+				end
 
 				local blob = inputcontroller.blob
 				blob[15] = delta.X
 				blob[16] = delta.Y
-			elseif len == 2 then
+			end
+			
+			--- intent to pinch
+			if len == 2 then
+				for _, guiobject in ipairs(inputcontroller.touchsinkguiobjects) do
+					if isinputinbounds(guiobject.AbsolutePosition, guiobject.AbsoluteSize, inputobject) then
+						inputcontroller.blob[17] = 0
+						return Enum.ContextActionResult.Pass
+					end
+				end
+
 				--- intent to pinch
 				local io1: InputObject, io2: InputObject = t[1], t[2]
 				local position1, position2 = io1.Position, io2.Position
@@ -665,6 +778,21 @@ function inputcontroller.touch(action: string, inputstate: Enum.UserInputState, 
 					local deltadistance = inputcontroller.touchlastdistance - distance
 
 					local blob = inputcontroller.blob
+					if deltadistance < 0 then
+						--- zooming in (fingers going further apart)
+						if inputcontroller.touchcanzoomin then
+							--- ok
+						else
+							deltadistance = 0
+						end
+					elseif deltadistance > 0 then
+						--- zooming out (fingers getting closer together)
+						if inputcontroller.touchcanzoomout then
+							--- ok
+						else
+							deltadistance = 0
+						end
+					end
 					blob[17] += deltadistance
 				end
 			end
@@ -700,7 +828,6 @@ end
 
 --- returns an empty touchgui
 function inputcontroller.createtouchgui(playergui: PlayerGui)
-	--- base touchgui
 	local touchgui = Instance.new("ScreenGui")
 	touchgui.Name = "cc_touchgui"
 	touchgui.IgnoreGuiInset = false
@@ -767,7 +894,6 @@ end
 
 --- returns an empty virtual cursor
 function inputcontroller.createvirtualcursor(playergui: PlayerGui)
-	--- base touchgui
 	local virtualcursorgui = Instance.new("ScreenGui")
 	virtualcursorgui.Name = "cc_virtualcursorgui"
 	virtualcursorgui.IgnoreGuiInset = true
@@ -776,20 +902,20 @@ function inputcontroller.createvirtualcursor(playergui: PlayerGui)
 	virtualcursorgui.ResetOnSpawn = false
 	virtualcursorgui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 
-	local cursor = Instance.new("CanvasGroup")
-	cursor.Name = "Cursor"
-	cursor.AnchorPoint = Vector2.one * 0.5
-	cursor.Size = UDim2.fromOffset(64, 64)
-	cursor.Position = UDim2.fromScale(0.5, 0.5)
-	cursor.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
-	cursor.BackgroundTransparency = 1
-	cursor.BorderSizePixel = 0
-	cursor.ZIndex = 1
-	cursor.Parent = virtualcursorgui
+	local canvasgroup = Instance.new("CanvasGroup")
+	canvasgroup.Name = "Cursor"
+	canvasgroup.AnchorPoint = Vector2.one * 0.5
+	canvasgroup.Size = UDim2.fromOffset(64, 64)
+	canvasgroup.Position = UDim2.fromScale(0.5, 0.5)
+	canvasgroup.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+	canvasgroup.BackgroundTransparency = 1
+	canvasgroup.BorderSizePixel = 0
+	canvasgroup.ZIndex = 1
+	canvasgroup.Parent = virtualcursorgui
 
 	virtualcursorgui.Parent = playergui
 
-	return virtualcursorgui
+	return virtualcursorgui, canvasgroup
 end
 
 --- applies cursor appearance `a` to virtual cursor canvas group `cursorcanvasgroup`
@@ -823,6 +949,59 @@ function inputcontroller.applyvirtualcursorfromappearance(a: typeof(inputcontrol
 	end
 
 	return frames
+end
+
+function inputcontroller.createdebuggui(playergui: PlayerGui)
+	local debuggui = Instance.new("ScreenGui")
+	debuggui.Name = "cc_debuggui"
+	debuggui.ClipToDeviceSafeArea = false
+	debuggui.IgnoreGuiInset = false
+	debuggui.ScreenInsets = Enum.ScreenInsets.CoreUISafeInsets
+	debuggui.SafeAreaCompatibility = Enum.SafeAreaCompatibility.None
+	debuggui.ResetOnSpawn = false
+	debuggui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+	debuggui.DisplayOrder = 99
+
+	local textlabel = Instance.new("TextLabel")
+	textlabel.AnchorPoint = Vector2.zero
+	textlabel.BackgroundTransparency = 1
+	textlabel.Position = UDim2.fromOffset(0, 0)
+	textlabel.Size = UDim2.fromOffset(64, 64)
+	textlabel.Font = inputcontroller.debugguifont
+	textlabel.RichText = true
+	textlabel.Text = ""
+	textlabel.TextSize = inputcontroller.debugguitextsize
+	textlabel.TextColor3 = inputcontroller.debugguitextcolor
+	textlabel.TextStrokeTransparency = 1/3
+	textlabel.TextXAlignment = Enum.TextXAlignment.Left
+	textlabel.TextYAlignment = Enum.TextYAlignment.Top
+	textlabel.Parent = debuggui
+
+	debuggui.Parent = playergui
+
+	return debuggui, textlabel
+end
+
+function inputcontroller.writedebugguienabled(state: boolean?)
+	local debuggui = inputcontroller.debuggui
+	if debuggui then
+		debuggui.Enabled = if state ~= nil then state else not debuggui.Enabled
+	else
+		warn("debuggui not created")
+	end
+end
+
+function inputcontroller.readdebugguienabled()
+	local debuggui = inputcontroller.debuggui
+	if debuggui then
+		return debuggui.Enabled
+	else
+		return false
+	end
+end
+
+function inputcontroller.debugmarkstring()
+	
 end
 
 --- returns internally-resolved `UserInputService.PreferredInput` signal based on recency
@@ -875,14 +1054,43 @@ if RunService:IsClient() then
 		local s, e = pcall(function()
 			local playergui = localplayer:WaitForChild("PlayerGui")
 			assert(playergui:IsA("PlayerGui"), string.format("expected playergui, got %s", playergui.ClassName))
-			local virtualcursor = inputcontroller.createvirtualcursor(playergui)
+			local virtualcursor, canvasgroup = inputcontroller.createvirtualcursor(playergui)
 			
 			inputcontroller.virtualcursor = virtualcursor
-			inputcontroller.virtualcursorcanvasgroup = virtualcursor:FindFirstChild("Cursor") :: CanvasGroup?
+			inputcontroller.virtualcursorcanvasgroup = canvasgroup
 
 			if inputcontroller.virtualcursorcanvasgroup then
 				inputcontroller.applyvirtualcursorfromappearance(inputcontroller.virtualcursorappearance, inputcontroller.virtualcursorcanvasgroup)
 			end
+
+			return true
+		end)
+		if not s then warn(e) end
+	end
+	do --- resolve debug gui
+		local s, e = pcall(function()
+			local playergui = localplayer:WaitForChild("PlayerGui")
+			assert(playergui:IsA("PlayerGui"), string.format("expected playergui, got %s", playergui.ClassName))
+			local debuggui, textlabel = inputcontroller.createdebuggui(playergui)
+			
+			inputcontroller.debuggui = debuggui
+			inputcontroller.debugguitextlabel = textlabel
+
+			local lasttext = ""
+			RunService.Heartbeat:Connect(function()
+				local text = inputcontroller.debugguitext
+				if debuggui.Enabled and lasttext ~= text then
+					lasttext = text
+
+					textlabel.Text = string.format(
+						"<mark color='#%s' transparency='%.3f'><text size='%d'>%s</text></mark>",
+						inputcontroller.debugguimarkcolorhex,
+						inputcontroller.debugguimarktransparency,
+						inputcontroller.debugguitextsize,
+						text
+					)
+				end
+			end)
 
 			return true
 		end)
@@ -896,6 +1104,7 @@ if RunService:IsClient() then
 				if inputcontroller.preferredinput ~= thispreferredinput then
 					inputcontroller.preferredinput = thispreferredinput
 
+					--- print(string.format("[input rebind] to '%s' (inputtype: '%s', touchenabled: '%s')", thispreferredinput.Name, userinputtype.Name, tostring(UserInputService.TouchEnabled)))
 					script:SetAttribute(inputcontroller.preferredinputflag, inputcontroller.preferredinput.Value)
 				end
 			end
@@ -917,27 +1126,17 @@ if RunService:IsClient() then
 		debugsquare.Visible = false
 		debugsquare.Parent = inputcontroller.virtualcursor
 
-		local debugorigin = Instance.new("Part")
-		debugorigin.Name = "cc_debugorigin"
-		debugorigin.Size = Vector3.one
-		debugorigin.Color = Color3.fromRGB(255, 0, 255)
-		debugorigin.Transparency = 1
-		debugorigin.CastShadow = false
-		debugorigin.Anchored = true
-		debugorigin.CanCollide = false
-		debugorigin.CanQuery = false
-		debugorigin.CanTouch = false
-		debugorigin.Parent = workspace
-
 		local debugcone = Instance.new("ConeHandleAdornment")
 		debugcone.Name = "cc_debugcone"
-		debugcone.Adornee = debugorigin
+		debugcone.Adornee = workspace.Terrain
 		debugcone.Height = 0.5
 		debugcone.Radius = 0.25
 		debugcone.Color3 = Color3.fromRGB(255, 0, 255)
-		debugcone.Shading = Enum.AdornShading.XRay
+		--- debugcone.Shading = Enum.AdornShading.XRay
+		debugcone.AlwaysOnTop = true
+		debugcone.ZIndex = 1
 		debugcone.Visible = false
-		debugcone.Parent = debugorigin
+		debugcone.Parent = script
 
 		RunService.RenderStepped:Connect(function()
 			local virtualcursorcanvasgroup = inputcontroller.virtualcursorcanvasgroup
