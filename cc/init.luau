@@ -59,6 +59,9 @@ local cc = {
 		--- binary integer [0|1] describing downward input (slide)
 		inputdown = 0;
 
+		--- fix residual jump input after landing with a bounce
+		lastfloored = false;
+
 		--- empty camera cframe
 		cameracframe = CFrame.identity;
 
@@ -308,6 +311,12 @@ function cc.step(character: typeof(cc.create()))
 
 	local isflying = input.flying
 	local vertical = input.inputup - input.inputdown
+
+	--- cancel
+	if floor and input.lastfloored == false then
+		--- print("BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB")
+		input.inputup = 0
+	end
 
 	--- jump
 	local floatvector = Vector3.zero

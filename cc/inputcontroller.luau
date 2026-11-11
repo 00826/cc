@@ -76,11 +76,15 @@ local inputcontroller = {
 	--- `[19]`: touch thumbstick y \
 	--- `[20]`: gamepad left stick x \
 	--- `[21]`: gamepad left stick y \
-	--- `[22]`: gamepad left stick press
+	--- `[22]`: gamepad left stick press \
 	--- `[23]`: gamepad right stick x \
-	--- `[24]`: gamepad right stick y
-	--- `[25]`: gamepad right stick press
-	blob = table.create(25, 0);
+	--- `[24]`: gamepad right stick y \
+	--- `[25]`: gamepad right stick press \
+	--- `[26]`: gamepad dpad up \
+	--- `[27]`: gamepad dpad down \
+	--- `[28]`: gamepad dpad left \
+	--- `[29]`: gamepad dpad right
+	blob = table.create(29, 0);
 	sensitivitymodifier = 1;
 
 	staticthumbstick = false;
@@ -106,6 +110,10 @@ local inputcontroller = {
 		[Enum.KeyCode.Thumbstick2] = { index = 0; value = 0; preferredinput = Enum.PreferredInput.Gamepad };
 		--- [Enum.KeyCode.ButtonL3] = { index = 22; value = 0; preferredinput = Enum.PreferredInput.Gamepad };
 		[Enum.KeyCode.ButtonR3] = { index = 25; value = 1; preferredinput = Enum.PreferredInput.Gamepad };
+		[Enum.KeyCode.DPadUp] = { index = 26; value = -1; preferredinput = Enum.PreferredInput.Gamepad };
+		[Enum.KeyCode.DPadDown] = { index = 27; value = 1; preferredinput = Enum.PreferredInput.Gamepad };
+		[Enum.KeyCode.DPadLeft] = { index = 28; value = -1; preferredinput = Enum.PreferredInput.Gamepad };
+		[Enum.KeyCode.DPadRight] = { index = 29; value = 1; preferredinput = Enum.PreferredInput.Gamepad };
 	} :: {[Enum.KeyCode|Enum.UserInputType]: {index: number, value: number, preferredinput: Enum.PreferredInput}};
 
 	--- interally-resolved preferred input based on recency
@@ -231,7 +239,7 @@ local inputcontroller = {
 	--- touchgui is always instantiated
 	--- regardless of current input \
 	--- for consistency
-	virtualcursorgui = nil :: ScreenGui?;
+	virtualcursor = nil :: ScreenGui?;
 	virtualcursorcanvasgroup = nil :: CanvasGroup?;
 	virtualcursortransparency = 1/3; --- canvasgroup transparency
 	virtualcursorappearance = {
